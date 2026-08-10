@@ -12,6 +12,7 @@ from utils.helper import (
     inject_custom_theme,
     load_data,
     fetch_yf_info,
+    drop_holiday_nans,
     _fmt_money,
     _fmt_num,
     _fmt_pct,
@@ -39,6 +40,7 @@ currency_sym = CURRENCY_SYMBOLS.get(currency, "$")
 
 # Fetch YFinance Data & Metadata
 df = load_data(ticker, period=period, interval=interval)
+df = drop_holiday_nans(df)
 info = fetch_yf_info(ticker)
 
 # Main Title & Header Section
@@ -111,10 +113,11 @@ else:
             
         if chart_period != period or chart_interval != interval:
             chart_df = load_data(ticker, period=chart_period, interval=chart_interval)
+            chart_df = drop_holiday_nans(chart_df)
             if chart_df.empty:
                 chart_df = df
         else:
-            chart_df = df
+            chart_df = drop_holiday_nans(df)
 
     with col_ma:
         st.markdown("**Technical Overlays:**")
@@ -124,7 +127,11 @@ else:
     with col_vol:
         st.markdown("**Chart Customizations:**")
         show_volume = st.checkbox("Show Volume Subplot", value=True)
+        hide_gaps = st.checkbox("Hide Non-Trading Gaps", value=True)
         chart_type = st.radio("Chart Style", ["Candlestick", "Line"], horizontal=True, label_visibility="collapsed")
+
+    # Format x-axis timestamps for category view if enabled
+    x_vals = [d.strftime('%b %d, %Y %H:%M') if hasattr(d, 'strftime') and hasattr(d, 'hour') and d.hour != 0 else (d.strftime('%b %d, %Y') if hasattr(d, 'strftime') else str(d)) for d in chart_df.index] if hide_gaps else chart_df.index
 
     # ---------------------------------------------------------
     # 3. Plotly Candlestick / Line Chart Construction
@@ -142,7 +149,7 @@ else:
     if chart_type == "Candlestick":
         fig.add_trace(
             go.Candlestick(
-                x=chart_df.index,
+                x=x_vals,
                 open=chart_df["Open"],
                 high=chart_df["High"],
                 low=chart_df["Low"],
@@ -158,7 +165,7 @@ else:
     else:
         fig.add_trace(
             go.Scatter(
-                x=chart_df.index,
+                x=x_vals,
                 y=chart_df["Close"],
                 mode="lines",
                 name="Close Price",
@@ -172,7 +179,7 @@ else:
         sma20 = chart_df["Close"].rolling(window=20).mean()
         fig.add_trace(
             go.Scatter(
-                x=chart_df.index,
+                x=x_vals,
                 y=sma20,
                 mode="lines",
                 name="SMA 20",
@@ -185,7 +192,7 @@ else:
         sma50 = chart_df["Close"].rolling(window=50).mean()
         fig.add_trace(
             go.Scatter(
-                x=chart_df.index,
+                x=x_vals,
                 y=sma50,
                 mode="lines",
                 name="SMA 50",
@@ -202,7 +209,7 @@ else:
         ]
         fig.add_trace(
             go.Bar(
-                x=chart_df.index,
+                x=x_vals,
                 y=chart_df["Volume"],
                 name="Volume",
                 marker_color=colors,
@@ -232,7 +239,11 @@ else:
     fig.update_yaxes(title_text=f"Price ({currency_sym})", row=1, col=1, gridcolor="rgba(255,255,255,0.05)")
     if show_volume:
         fig.update_yaxes(title_text="Volume", row=2, col=1, gridcolor="rgba(255,255,255,0.05)")
-    fig.update_xaxes(gridcolor="rgba(255,255,255,0.05)")
+    
+    if hide_gaps:
+        fig.update_xaxes(type='category', gridcolor="rgba(255,255,255,0.05)", nticks=12)
+    else:
+        fig.update_xaxes(gridcolor="rgba(255,255,255,0.05)")
 
     st.plotly_chart(fig, use_container_width=True)
 

@@ -213,6 +213,43 @@ def fetch_periods_intervals():
         "max": ["1d", "5d", "1wk", "1mo"]
     }
 
+def drop_holiday_nans(df):
+    """
+    Remove NSE/BSE non-trading days (Republic Day, Diwali, market holidays, etc.)
+    and NaN/flat placeholder rows to prevent false trading signals.
+    """
+    if df is None or df.empty:
+        return pd.DataFrame()
+
+    df_clean = df.copy()
+
+    # Flatten MultiIndex columns if present
+    if isinstance(df_clean.columns, pd.MultiIndex):
+        df_clean.columns = df_clean.columns.get_level_values(0)
+
+    # Drop rows where key price columns are NaN
+    price_cols = [col for col in ["Close", "Open", "High", "Low"] if col in df_clean.columns]
+    if price_cols:
+        df_clean = df_clean.dropna(subset=price_cols, how="all")
+    else:
+        df_clean = df_clean.dropna(how="all")
+
+    if df_clean.empty:
+        return df_clean
+
+    # Filter out non-trading holiday rows where Volume is 0 and Open == High == Low == Close (flat line)
+    if "Volume" in df_clean.columns and all(c in df_clean.columns for c in ["Open", "High", "Low", "Close"]):
+        is_zero_vol = (df_clean["Volume"] == 0) | df_clean["Volume"].isna()
+        is_flat_price = (
+            (df_clean["Open"] == df_clean["Close"]) &
+            (df_clean["High"] == df_clean["Low"]) &
+            (df_clean["Open"] == df_clean["High"])
+        )
+        holiday_mask = is_zero_vol & is_flat_price
+        df_clean = df_clean[~holiday_mask]
+
+    return df_clean.dropna(how="all")
+
 @st.cache_data(show_spinner=False)
 def load_data(ticker, period="1y", interval="1d"):
     """Load stock data from yfinance for given period and interval."""
@@ -228,7 +265,7 @@ def load_data(ticker, period="1y", interval="1d"):
             return pd.DataFrame()
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
-        return df
+        return drop_holiday_nans(df)
     except Exception:
         return pd.DataFrame()
 
