@@ -15,24 +15,14 @@ import ruptures as rpt
 # Ensure utils directory is in Python path
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "utils"))
 
-try:
-    from utils.helper import (
-        inject_custom_theme,
-        load_data,
-        drop_holiday_nans,
-        CURRENCY_SYMBOLS,
-        _fmt_pct
-    )
-    from utils.sidebar import render_sidebar
-except ImportError:
-    from helper import (
-        inject_custom_theme,
-        load_data,
-        drop_holiday_nans,
-        CURRENCY_SYMBOLS,
-        _fmt_pct
-    )
-    from sidebar import render_sidebar
+from utils.helper import (
+    inject_custom_theme,
+    load_data,
+    drop_holiday_nans,
+    CURRENCY_SYMBOLS,
+    _fmt_pct
+)
+from utils.sidebar import render_sidebar
 
 # Page Configuration
 st.set_page_config(
@@ -391,9 +381,6 @@ st.title("🎯 Market Regime Detection")
 st.caption(f"Identify Bull / Bear / High-Volatility / Low-Volatility Regimes for **{company} ({ticker})**")
 st.markdown(f"**{ticker}** | **{period.upper()}** | **{return_type}** ({len(ret_series):,} observations)")
 
-if len(ret_series) < 500:
-    st.warning(f"⚠️ **Short history ({len(ret_series)} observations)** — Regime estimates may be unstable with < 500 observations. Consider selecting a 2Y or 5Y period for higher statistical reliability.")
-
 # Summary Metric Cards (5 Cards Layout)
 m1, m2, m3, m4, m5 = st.columns(5)
 
@@ -428,7 +415,14 @@ with col_vw:
 if timeline_view == "Price + Regime Bands":
     fig_timeline = go.Figure()
     
-    # Legend entries for background regime colors
+    # 1. Primary Price line trace FIRST to establish date x-axis
+    fig_timeline.add_trace(go.Scatter(
+        x=dates, y=prices, mode="lines", name="Price",
+        line=dict(color="#F8FAFC", width=1.8),
+        hovertemplate="<b>Date:</b> %{x|%b %d, %Y}<br><b>Price:</b> " + currency_sym + "%{y:,.2f}<extra></extra>"
+    ))
+
+    # 2. Legend entries for background regime colors
     if ref_states is not None:
         for k in range(n_regimes):
             color = colors_map.get(k, REGIME_COLORS[k % len(REGIME_COLORS)])
@@ -439,13 +433,7 @@ if timeline_view == "Price + Regime Bands":
                 showlegend=True
             ))
 
-    fig_timeline.add_trace(go.Scatter(
-        x=dates, y=prices, mode="lines", name="Price",
-        line=dict(color="#F8FAFC", width=1.8),
-        hovertemplate="<b>Date:</b> %{x|%b %d, %Y}<br><b>Price:</b> " + currency_sym + "%{y:,.2f}<extra></extra>"
-    ))
-    
-    if ref_states is not None:
+        # 3. Continuous background regime bands
         changes = np.where(np.diff(ref_states) != 0)[0]
         start_idx = 0
         for change_idx in list(changes) + [len(ref_states) - 1]:
@@ -455,20 +443,35 @@ if timeline_view == "Price + Regime Bands":
                 x0=dates[start_idx], x1=dates[change_idx],
                 fillcolor=color_k, opacity=0.25, line_width=0
             )
-            start_idx = change_idx + 1
+            start_idx = change_idx
+
+        # 4. Dotted vertical lines when a regime is getting changed
+        for c_idx in changes:
+            fig_timeline.add_vline(
+                x=dates[c_idx + 1], line_dash="dot",
+                line_color="rgba(255, 255, 255, 0.6)", line_width=1.5
+            )
 
     fig_timeline.update_layout(
         template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.6)",
         height=450, margin=dict(l=20, r=20, t=30, b=20),
         legend=dict(orientation="h", y=1.12, x=1, xanchor="right"),
         yaxis=dict(title=f"Price ({currency_sym})", gridcolor="rgba(255,255,255,0.05)"),
-        xaxis=dict(gridcolor="rgba(255,255,255,0.05)")
+        xaxis=dict(title="Date", type="date", gridcolor="rgba(255,255,255,0.05)")
     )
     st.plotly_chart(fig_timeline, use_container_width=True)
 
 elif timeline_view == "Returns + Regime":
     fig_ret = go.Figure()
     
+    # 1. Primary Daily Return line trace FIRST
+    fig_ret.add_trace(go.Scatter(
+        x=dates, y=ret_series * 100.0, mode="lines", name="Daily Return (%)",
+        line=dict(color="#38BDF8", width=1.2),
+        hovertemplate="<b>Date:</b> %{x|%b %d, %Y}<br><b>Return:</b> %{y:+.2f}%<extra></extra>"
+    ))
+
+    # 2. Legend entries for background regime colors
     if ref_states is not None:
         for k in range(n_regimes):
             color = colors_map.get(k, REGIME_COLORS[k % len(REGIME_COLORS)])
@@ -479,12 +482,7 @@ elif timeline_view == "Returns + Regime":
                 showlegend=True
             ))
 
-    fig_ret.add_trace(go.Scatter(
-        x=dates, y=ret_series * 100.0, mode="lines", name="Daily Return (%)",
-        line=dict(color="#38BDF8", width=1.2),
-        hovertemplate="<b>Date:</b> %{x|%b %d, %Y}<br><b>Return:</b> %{y:+.2f}%<extra></extra>"
-    ))
-    if ref_states is not None:
+        # 3. Continuous background regime bands
         changes = np.where(np.diff(ref_states) != 0)[0]
         start_idx = 0
         for change_idx in list(changes) + [len(ref_states) - 1]:
@@ -494,14 +492,21 @@ elif timeline_view == "Returns + Regime":
                 x0=dates[start_idx], x1=dates[change_idx],
                 fillcolor=color_k, opacity=0.25, line_width=0
             )
-            start_idx = change_idx + 1
+            start_idx = change_idx
+
+        # 4. Dotted vertical lines when a regime is getting changed
+        for c_idx in changes:
+            fig_ret.add_vline(
+                x=dates[c_idx + 1], line_dash="dot",
+                line_color="rgba(255, 255, 255, 0.6)", line_width=1.5
+            )
 
     fig_ret.update_layout(
         template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.6)",
         height=450, margin=dict(l=20, r=20, t=30, b=20),
         legend=dict(orientation="h", y=1.12, x=1, xanchor="right"),
         yaxis=dict(title="Daily Return (%)", gridcolor="rgba(255,255,255,0.05)"),
-        xaxis=dict(gridcolor="rgba(255,255,255,0.05)")
+        xaxis=dict(title="Date", type="date", gridcolor="rgba(255,255,255,0.05)")
     )
     st.plotly_chart(fig_ret, use_container_width=True)
 
@@ -516,11 +521,20 @@ else:
                 stackgroup="one", fillcolor=color, line=dict(color=color, width=0.5),
                 hovertemplate=f"<b>P({labels_map.get(k, f'State {k}')}):</b> %{{y:.1f}}%<extra></extra>"
             ))
+
+        if ref_states is not None:
+            changes = np.where(np.diff(ref_states) != 0)[0]
+            for c_idx in changes:
+                fig_p.add_vline(
+                    x=dates[c_idx + 1], line_dash="dot",
+                    line_color="rgba(255, 255, 255, 0.6)", line_width=1.5
+                )
+
     fig_p.update_layout(
         template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.6)",
         height=420, margin=dict(l=20, r=20, t=20, b=20),
         yaxis=dict(title="Probability (%)", range=[0, 100], gridcolor="rgba(255,255,255,0.05)"),
-        xaxis=dict(gridcolor="rgba(255,255,255,0.05)"),
+        xaxis=dict(title="Date", type="date", gridcolor="rgba(255,255,255,0.05)"),
         legend=dict(orientation="h", y=1.12, x=1, xanchor="right")
     )
     st.plotly_chart(fig_p, use_container_width=True)
@@ -704,6 +718,14 @@ with tab_gmm:
         st.subheader("📈 GMM Regime Timeline & Background Bands")
         fig_gmm_timeline = go.Figure()
 
+        # Primary Price line trace FIRST to establish date x-axis
+        fig_gmm_timeline.add_trace(go.Scatter(
+            x=dates, y=prices, mode="lines", name="Price",
+            line=dict(color="#F8FAFC", width=1.8),
+            hovertemplate="<b>Date:</b> %{x|%b %d, %Y}<br><b>Price:</b> " + currency_sym + "%{y:,.2f}<extra></extra>"
+        ))
+
+        # Dummy legend traces SECOND
         for k in range(n_regimes):
             color = g_colors.get(k, REGIME_COLORS[k % len(REGIME_COLORS)])
             badge = g_badges.get(k, f"Comp {k}")
@@ -712,12 +734,6 @@ with tab_gmm:
                 marker=dict(size=10, color=color, symbol="square"),
                 showlegend=True
             ))
-
-        fig_gmm_timeline.add_trace(go.Scatter(
-            x=dates, y=prices, mode="lines", name="Price",
-            line=dict(color="#F8FAFC", width=1.8),
-            hovertemplate="<b>Date:</b> %{x|%b %d, %Y}<br><b>Price:</b> " + currency_sym + "%{y:,.2f}<extra></extra>"
-        ))
 
         changes_gmm = np.where(np.diff(gmm_states) != 0)[0]
         start_idx = 0
@@ -728,14 +744,21 @@ with tab_gmm:
                 x0=dates[start_idx], x1=dates[change_idx],
                 fillcolor=color_k, opacity=0.22, line_width=0
             )
-            start_idx = change_idx + 1
+            start_idx = change_idx
+
+        # Dotted vertical lines on GMM regime transition dates
+        for c_idx in changes_gmm:
+            fig_gmm_timeline.add_vline(
+                x=dates[c_idx + 1], line_dash="dot",
+                line_color="rgba(255, 255, 255, 0.6)", line_width=1.5
+            )
 
         fig_gmm_timeline.update_layout(
             template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.6)",
             height=420, margin=dict(l=20, r=20, t=30, b=20),
             legend=dict(orientation="h", y=1.12, x=1, xanchor="right"),
             yaxis=dict(title=f"Price ({currency_sym})", gridcolor="rgba(255,255,255,0.05)"),
-            xaxis=dict(gridcolor="rgba(255,255,255,0.05)")
+            xaxis=dict(title="Date", type="date", gridcolor="rgba(255,255,255,0.05)")
         )
         st.plotly_chart(fig_gmm_timeline, use_container_width=True)
 
@@ -787,6 +810,11 @@ with tab_cpd:
             
         fig_cusum = go.Figure()
         
+        # Primary Price line trace FIRST
+        fig_cusum.add_trace(go.Scatter(
+            x=dates, y=prices, mode="lines", name="Price", line=dict(color="#F8FAFC", width=1.8)
+        ))
+
         cusum_bounds = [0] + list(cusum_cps) + [len(ret_series)]
         for s_idx in range(len(cusum_bounds) - 1):
             b_start = cusum_bounds[s_idx]
@@ -797,18 +825,14 @@ with tab_cpd:
                 fillcolor=seg_color, opacity=0.18, line_width=0
             )
 
-        fig_cusum.add_trace(go.Scatter(
-            x=dates, y=prices, mode="lines", name="Price", line=dict(color="#F8FAFC", width=1.8)
-        ))
-        
         for cp_d in cp_dates:
-            fig_cusum.add_vline(x=cp_d, line_dash="dash", line_color="#FF5252", opacity=0.9)
+            fig_cusum.add_vline(x=cp_d, line_dash="dot", line_color="#FF5252", line_width=1.5, opacity=0.9)
             
         fig_cusum.update_layout(
             template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.6)",
             height=420, title="CUSUM Change Point Timeline & Shaded Regime Segments", margin=dict(l=20, r=20, t=40, b=20),
             yaxis=dict(title=f"Price ({currency_sym})", gridcolor="rgba(255,255,255,0.05)"),
-            xaxis=dict(gridcolor="rgba(255,255,255,0.05)")
+            xaxis=dict(title="Date", type="date", gridcolor="rgba(255,255,255,0.05)")
         )
         st.plotly_chart(fig_cusum, use_container_width=True)
 
@@ -859,6 +883,11 @@ with tab_cpd:
         st.dataframe(pd.DataFrame(segment_rows), use_container_width=True)
 
         fig_pelt = go.Figure()
+
+        # Primary Price line trace FIRST
+        fig_pelt.add_trace(go.Scatter(
+            x=dates, y=prices, mode="lines", name="Price", line=dict(color="#F8FAFC", width=1.8)
+        ))
         
         boundaries = [0] + list(pelt_cps) + [len(ret_series)]
         for s_idx in range(len(boundaries) - 1):
@@ -875,12 +904,8 @@ with tab_cpd:
                 showlegend=True
             ))
 
-        fig_pelt.add_trace(go.Scatter(
-            x=dates, y=prices, mode="lines", name="Price", line=dict(color="#F8FAFC", width=1.8)
-        ))
-        
         for cp_d in pelt_dates:
-            fig_pelt.add_vline(x=cp_d, line_dash="dot", line_color="#F59E0B", opacity=0.85)
+            fig_pelt.add_vline(x=cp_d, line_dash="dot", line_color="#F59E0B", line_width=1.5, opacity=0.85)
             
         fig_pelt.update_layout(
             template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.6)",
@@ -888,7 +913,7 @@ with tab_cpd:
             margin=dict(l=20, r=20, t=40, b=20),
             legend=dict(orientation="h", y=1.12, x=1, xanchor="right"),
             yaxis=dict(title=f"Price ({currency_sym})", gridcolor="rgba(255,255,255,0.05)"),
-            xaxis=dict(gridcolor="rgba(255,255,255,0.05)")
+            xaxis=dict(title="Date", type="date", gridcolor="rgba(255,255,255,0.05)")
         )
         st.plotly_chart(fig_pelt, use_container_width=True)
 

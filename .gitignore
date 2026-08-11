@@ -10,6 +10,9 @@ env/
 # Data snapshot caches / large generated
 *.log
 
+#page usder construction
+pages/
+
 # Streamlit / Jupyter
 .streamlit/
 .ipynb_checkpoints/

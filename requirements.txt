@@ -1,9 +1,23 @@
+# Core Web Framework & Data Sources
 streamlit>=1.28.0
 yfinance>=0.2.31
 pandas>=2.0.0
 numpy>=1.24.0
+
+# Visualization & Graphics
 plotly>=5.15.0
-hmmlearn>=0.3.0
-scikit-learn>=1.2.0
+
+# Statistical Modeling & Econometrics
+statsmodels>=0.14.0
 scipy>=1.10.0
+
+# Machine Learning & Regime Detection
+scikit-learn>=1.2.0
+hmmlearn>=0.3.0
 ruptures>=1.1.8
+xgboost>=2.0.0
+lightgbm>=4.0.0
+
+# Deep Learning (Forecasting Models)
+torch>=2.0.0
+tensorflow>=2.14.0
