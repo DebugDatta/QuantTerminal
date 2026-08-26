@@ -1,8 +1,8 @@
 """Mean-Variance optimization. Spec: docs/PORTFOLIO_OPTIMIZATION.md -> Optimization Methods."""
 
-from typing import Optional, Tuple
-
+import numpy as np
 import pandas as pd
+import cvxpy as cp
 
 
 def max_sharpe(
@@ -15,7 +15,38 @@ def max_sharpe(
 
     Returns dict with keys: weights (pd.Series), expected_return, volatility, sharpe.
     """
-    raise NotImplementedError
+    n = returns.shape[1]
+    mu = returns.mean().values
+    L = np.linalg.cholesky(cov_matrix.values)
+
+    w = cp.Variable(n)
+    t = cp.Variable(nonneg=True)
+
+    adjusted_mu = mu - risk_free_rate
+
+    prob = cp.Problem(
+        cp.Minimize(-adjusted_mu @ w),
+        [
+            cp.SOC(t, L.T @ w),
+            cp.sum(w) == 1,
+            t >= 0,
+        ]
+        + ([] if allow_short else [w >= 0]),
+    )
+
+    try:
+        prob.solve(solver=cp.SCS)
+        if prob.status in ("infeasible", "unbounded") or w.value is None:
+            raise ValueError(f"Problem status: {prob.status}")
+        weights = pd.Series(w.value, index=returns.columns, name="weights")
+        weights = weights / weights.abs().sum()
+        exp_ret = float(mu @ weights.values)
+        vol = float(np.sqrt(weights.values @ cov_matrix.values @ weights.values))
+        sharpe = float((exp_ret - risk_free_rate) / vol) if vol > 0 else 0.0
+        return {"weights": weights, "expected_return": exp_ret, "volatility": vol, "sharpe": sharpe}
+    except (cp.SolverError, ValueError):
+        nan_weights = pd.Series(np.nan, index=returns.columns, name="weights")
+        return {"weights": nan_weights, "expected_return": np.nan, "volatility": np.nan, "sharpe": np.nan}
 
 
 def min_variance(
@@ -27,7 +58,30 @@ def min_variance(
 
     Returns dict with keys: weights, expected_return, volatility, sharpe.
     """
-    raise NotImplementedError
+    n = returns.shape[1]
+    mu = returns.mean().values
+    S = cp.psd_wrap(cov_matrix.values)
+
+    w = cp.Variable(n)
+
+    prob = cp.Problem(
+        cp.Minimize(cp.quad_form(w, S)),
+        [cp.sum(w) == 1] + ([] if allow_short else [w >= 0]),
+    )
+
+    try:
+        prob.solve(solver=cp.SCS)
+        if prob.status in ("infeasible", "unbounded") or w.value is None:
+            raise ValueError(f"Problem status: {prob.status}")
+        weights = pd.Series(w.value, index=returns.columns, name="weights")
+        weights = weights / weights.abs().sum()
+        exp_ret = float(mu @ weights.values)
+        vol = float(np.sqrt(weights.values @ cov_matrix.values @ weights.values))
+        sharpe = float(exp_ret / vol) if vol > 0 else 0.0
+        return {"weights": weights, "expected_return": exp_ret, "volatility": vol, "sharpe": sharpe}
+    except (cp.SolverError, ValueError):
+        nan_weights = pd.Series(np.nan, index=returns.columns, name="weights")
+        return {"weights": nan_weights, "expected_return": np.nan, "volatility": np.nan, "sharpe": np.nan}
 
 
 def mean_variance(
@@ -40,4 +94,27 @@ def mean_variance(
 
     Returns dict with keys: weights, expected_return, volatility, sharpe.
     """
-    raise NotImplementedError
+    n = returns.shape[1]
+    mu = returns.mean().values
+    S = cp.psd_wrap(cov_matrix.values)
+
+    w = cp.Variable(n)
+
+    prob = cp.Problem(
+        cp.Minimize(cp.quad_form(w, S)),
+        [cp.sum(w) == 1, mu @ w == target_return] + ([] if allow_short else [w >= 0]),
+    )
+
+    try:
+        prob.solve(solver=cp.SCS)
+        if prob.status in ("infeasible", "unbounded") or w.value is None:
+            raise ValueError(f"Problem status: {prob.status}")
+        weights = pd.Series(w.value, index=returns.columns, name="weights")
+        weights = weights / weights.abs().sum()
+        exp_ret = float(mu @ weights.values)
+        vol = float(np.sqrt(weights.values @ cov_matrix.values @ weights.values))
+        sharpe = float(exp_ret / vol) if vol > 0 else 0.0
+        return {"weights": weights, "expected_return": exp_ret, "volatility": vol, "sharpe": sharpe}
+    except (cp.SolverError, ValueError):
+        nan_weights = pd.Series(np.nan, index=returns.columns, name="weights")
+        return {"weights": nan_weights, "expected_return": np.nan, "volatility": np.nan, "sharpe": np.nan}
