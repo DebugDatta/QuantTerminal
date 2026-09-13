@@ -1,23 +1,25 @@
-# Python
+# Python Bytecode & Environments
 __pycache__/
 *.py[cod]
+*$py.class
 *.so
 .venv/
 venv/
 env/
 *.egg-info/
+dist/
+build/
 
-# Data snapshot caches / large generated
+# Temporary Training & Diagnostic Logs
 *.log
+catboost_info/
+lightning_logs/
 
-#page usder construction
-pages/
-
-# Streamlit / Jupyter
+# Streamlit & Jupyter Caches
 .streamlit/
 .ipynb_checkpoints/
 
-# OS / editor
+# OS & Editor Metadata
 .DS_Store
 Thumbs.db
 .idea/
