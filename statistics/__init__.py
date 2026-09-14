@@ -1,4 +1,4 @@
-"""Statistics & risk modules - descriptive statistics and stationarity tests.
+"""Statistics & risk modules - descriptive statistics and diagnostic tests.
 
 Exports:
     summary_statistics - descriptive statistics of a return series
@@ -6,8 +6,12 @@ Exports:
     kpss_test          - KPSS stationarity test
     pp_test            - Phillips-Perron unit-root test
     zivot_andrews      - Zivot-Andrews unit-root test with one break
+    ljung_box          - Ljung-Box autocorrelation test on residuals
+    jarque_bera        - Jarque-Bera normality test
+    shapiro_wilk       - Shapiro-Wilk normality test
 """
 
+from statistics.diagnostics import jarque_bera, ljung_box, shapiro_wilk
 from statistics.stationarity import adf_test, kpss_test, pp_test, zivot_andrews
 from statistics.summary import summary_statistics
 
@@ -17,4 +21,7 @@ __all__ = [
     "kpss_test",
     "pp_test",
     "zivot_andrews",
+    "ljung_box",
+    "jarque_bera",
+    "shapiro_wilk",
 ]
