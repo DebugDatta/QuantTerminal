@@ -11,8 +11,11 @@ Exports:
     shapiro_wilk       - Shapiro-Wilk normality test
     distribution_data  - histogram / KDE / normal-overlay plot data
     qq_data            - normal-theory Q-Q plot data
+    correlation_matrix - Pearson + Spearman matrices with pairwise p-values
+    covariance_matrix  - sample covariance matrix
 """
 
+from statistics.correlation import correlation_matrix, covariance_matrix
 from statistics.diagnostics import jarque_bera, ljung_box, shapiro_wilk
 from statistics.distributions import distribution_data, qq_data
 from statistics.stationarity import adf_test, kpss_test, pp_test, zivot_andrews
@@ -29,4 +32,6 @@ __all__ = [
     "shapiro_wilk",
     "distribution_data",
     "qq_data",
+    "correlation_matrix",
+    "covariance_matrix",
 ]
