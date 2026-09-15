@@ -70,3 +70,29 @@ class TestMaxDrawdown:
         assert isinstance(result, pd.Series)
         assert result["A"] == pytest.approx(-0.20)
         assert result["B"] == pytest.approx(55.0 / 60.0 - 1.0)
+
+
+class TestEngineShapedInterface:
+    def test_datetime_index_preserved(self):
+        idx = pd.date_range("2024-01-01", periods=5, freq="D")
+        equity = pd.Series([100.0, 110.0, 121.0, 108.9, 119.79], index=idx)
+        result = drawdown_series(equity)
+        assert result.index.equals(idx)
+
+        frame = pd.DataFrame({"A": equity.values, "B": equity.values * 2}, index=idx)
+        result_df = drawdown_series(frame)
+        assert result_df.index.equals(idx)
+
+    def test_multiindex_column_pass_through(self):
+        idx = pd.date_range("2024-01-01", periods=4, freq="D")
+        cols = pd.MultiIndex.from_tuples([("RELIANCE.NS", "Close"), ("TCS.NS", "Close")])
+        frame = pd.DataFrame(
+            np.column_stack([[100.0, 110.0, 121.0, 108.9], [500.0, 520.0, 510.0, 530.0]]),
+            index=idx,
+            columns=cols,
+        )
+        result = drawdown_series(frame)
+        assert isinstance(result, pd.DataFrame)
+        assert result.index.equals(idx)
+        assert result.columns.equals(cols)
+        assert (result <= 0.0).all().all()

@@ -225,3 +225,24 @@ class TestAlpha:
     def test_matches_market_implies_zero_alpha(self):
         # portfolio = benchmark returns => alpha = 0
         assert alpha(BENCHMARK, BENCHMARK.copy()) == pytest.approx(0.0)
+
+
+class TestSeriesOnlyContract:
+    def test_sharpe_ratio_rejects_dataframe(self):
+        returns = pd.DataFrame(
+            {"A": RETURNS.values, "B": BENCHMARK.values}
+        )
+        with pytest.raises((TypeError, ValueError)):
+            sharpe_ratio(returns)
+
+    def test_sortino_ratio_rejects_dataframe(self):
+        returns = pd.DataFrame(
+            {"A": RETURNS.values, "B": BENCHMARK.values}
+        )
+        with pytest.raises((TypeError, ValueError)):
+            sortino_ratio(returns)
+
+    def test_calmar_ratio_rejects_dataframe(self):
+        equity = pd.DataFrame({"A": [100.0, 90.0, 80.0], "B": [50.0, 60.0, 55.0]})
+        with pytest.raises((TypeError, ValueError)):
+            calmar_ratio(equity)
