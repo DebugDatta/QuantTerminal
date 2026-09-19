@@ -60,18 +60,18 @@ def compute_statistics(df: pd.DataFrame) -> pd.DataFrame:
 def compute_technical(df: pd.DataFrame) -> pd.DataFrame:
     """Compute last 50 rows of RSI(14), MACD, and Bollinger Bands."""
     close = df["Close"].dropna()
-    rsi_vals = rsi(close, period=14)
-    macd_line, signal_line, hist = macd(close)
-    upper, mid, lower = bollinger_bands(close, period=20, std_dev=2)
+    rsi_vals = rsi(close, window=14)
+    macd_df = macd(close)
+    bb_df = bollinger_bands(close, window=20, num_std=2)
     result = pd.DataFrame({
         "Close": close,
         "RSI(14)": rsi_vals,
-        "MACD": macd_line,
-        "MACD Signal": signal_line,
-        "MACD Hist": hist,
-        "BB Upper": upper,
-        "BB Mid": mid,
-        "BB Lower": lower,
+        "MACD": macd_df["macd"],
+        "MACD Signal": macd_df["signal"],
+        "MACD Hist": macd_df["histogram"],
+        "BB Upper": bb_df["upper"],
+        "BB Mid": bb_df["middle"],
+        "BB Lower": bb_df["lower"],
     })
     return result.tail(50)
 
@@ -97,8 +97,8 @@ def compute_risk(df: pd.DataFrame) -> pd.DataFrame:
 def compute_strategy(df: pd.DataFrame) -> pd.DataFrame:
     """Compute SMA cross signal summary."""
     close = df["Close"].dropna()
-    sma_short = sma(close, period=10)
-    sma_long = sma(close, period=50)
+    sma_short = sma(close, window=10)
+    sma_long = sma(close, window=50)
     combined = pd.DataFrame({"sma_short": sma_short, "sma_long": sma_long}).dropna()
     signal = (combined["sma_short"] > combined["sma_long"]).astype(int).diff().dropna()
     buy_count = int((signal == 1).sum())

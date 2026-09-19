@@ -1,7 +1,5 @@
 """Momentum indicators. Spec: docs/TECHNICAL_INDICATORS.md section 2 & 7."""
 
-from typing import Optional
-
 import numpy as np
 import pandas as pd
 
