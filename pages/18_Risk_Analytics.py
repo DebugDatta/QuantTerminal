@@ -16,52 +16,25 @@ degrades to N/A / an informational note and the gap is recorded in the
 implementation report.
 """
 
-import os
-import sys
-
 import numpy as np
 import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-for _p in (ROOT, os.path.join(ROOT, "utils")):
-    if _p not in sys.path:
-        sys.path.append(_p)
-
-try:
-    from utils.helper import inject_custom_theme, load_data
-except ImportError:  # pragma: no cover - import fallback
-    from helper import inject_custom_theme, load_data
-
-try:
-    from core.returns import compute_returns
-    from core.metrics import (
-        sharpe_ratio,
-        sortino_ratio,
-        calmar_ratio,
-        information_ratio,
-        treynor_ratio,
-        beta,
-        alpha,
-    )
-    from core.drawdown import drawdown_series, max_drawdown
-    from risk.metrics import value_at_risk, conditional_var, tail_risk
-    from risk.rolling import rolling_sharpe, rolling_beta
-except ImportError:  # pragma: no cover - import fallback
-    from returns import compute_returns
-    from metrics import (
-        sharpe_ratio,
-        sortino_ratio,
-        calmar_ratio,
-        information_ratio,
-        treynor_ratio,
-        beta,
-        alpha,
-    )
-    from drawdown import drawdown_series, max_drawdown
-    from risk_metrics import value_at_risk, conditional_var, tail_risk
-    from rolling import rolling_sharpe, rolling_beta
+from utils.helper import inject_custom_theme, load_data
+from core.returns import compute_returns
+from core.metrics import (
+    sharpe_ratio,
+    sortino_ratio,
+    calmar_ratio,
+    information_ratio,
+    treynor_ratio,
+    beta,
+    alpha,
+)
+from core.drawdown import drawdown_series, max_drawdown
+from risk.metrics import value_at_risk, conditional_var, tail_risk
+from risk.rolling import rolling_sharpe, rolling_beta
 
 
 # ── Constants (documented values only) ───────────────────────────────────────

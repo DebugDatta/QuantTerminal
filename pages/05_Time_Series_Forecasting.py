@@ -12,8 +12,6 @@ Comprehensive quantitative suite incorporating:
 - Multi-Tier Confidence Corridors Fan Chart & CSV Research Tearsheet Exports
 """
 
-import os
-import sys
 import math
 import datetime
 import warnings
@@ -41,9 +39,6 @@ from statsmodels.stats.diagnostic import acorr_ljungbox
 from statsmodels.stats.stattools import jarque_bera
 
 import ruptures as rpt
-
-# Ensure utils directory is in Python path
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "utils"))
 
 from utils.helper import (
     inject_custom_theme,

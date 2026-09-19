@@ -17,8 +17,6 @@ Powered by TensorTrade (1.0.4) & Deep Neural Network Agents:
     8. 📋 Order Execution Log & CSV Research Tearsheet
 """
 
-import os
-import sys
 import math
 import random
 import datetime
@@ -45,9 +43,6 @@ from tensortrade.oms.instruments import Instrument, TradingPair
 from tensortrade.oms.wallets import Wallet, Portfolio
 from tensortrade.oms.exchanges import Exchange
 from tensortrade.oms.services.execution.simulated import execute_order
-
-# Ensure utils directory is in Python path
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "utils"))
 
 from utils.helper import (
     inject_custom_theme,

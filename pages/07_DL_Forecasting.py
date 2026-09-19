@@ -13,7 +13,6 @@ Institutional quantitative predictive analytics terminal incorporating:
 - Printable/downloadable quantitative research tearsheet export
 """
 
-import os
 import sys
 import datetime
 from pathlib import Path
@@ -26,15 +25,10 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-# Ensure project directories are in path
 BASE_DIR = Path(__file__).resolve().parent.parent
 ML_DL_DIR = BASE_DIR / "ml_dl"
-if str(BASE_DIR) not in sys.path:
-    sys.path.insert(0, str(BASE_DIR))
 if str(ML_DL_DIR) not in sys.path:
     sys.path.insert(0, str(ML_DL_DIR))
-if str(BASE_DIR / "utils") not in sys.path:
-    sys.path.insert(0, str(BASE_DIR / "utils"))
 
 from utils.helper import (
     inject_custom_theme,

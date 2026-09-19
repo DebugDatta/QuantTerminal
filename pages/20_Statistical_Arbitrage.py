@@ -72,44 +72,21 @@ REVIEW-LATER (documented conflicts/dependencies; also surfaced in-page):
            bare R^2 on trending levels is reported.
 """
 
-import os
-import sys
-
 import numpy as np
 import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-for _p in (ROOT, os.path.join(ROOT, "utils")):
-    if _p not in sys.path:
-        sys.path.append(_p)
-
-try:
-    from utils.helper import inject_custom_theme, load_data, fetch_stocks
-except ImportError:
-    from helper import inject_custom_theme, load_data, fetch_stocks
-
-try:
-    from statarb.pairs import find_pairs
-    from statarb.cointegration import engle_granger
-    from statarb.spread import (
-        calc_spread,
-        calc_zscore,
-        mean_reversion_signals,
-        half_life,
-        DEFAULT_WINDOW,
-    )
-except ImportError:
-    from pairs import find_pairs
-    from cointegration import engle_granger
-    from spread import (
-        calc_spread,
-        calc_zscore,
-        mean_reversion_signals,
-        half_life,
-        DEFAULT_WINDOW,
-    )
+from utils.helper import inject_custom_theme, load_data, fetch_stocks
+from statarb.pairs import find_pairs
+from statarb.cointegration import engle_granger
+from statarb.spread import (
+    calc_spread,
+    calc_zscore,
+    mean_reversion_signals,
+    half_life,
+    DEFAULT_WINDOW,
+)
 
 EXCHANGE_OPTIONS = ("Auto", "NSE", "BSE", "Global")
 SEARCH_METHODS = ("Correlation", "Distance", "Cointegration")

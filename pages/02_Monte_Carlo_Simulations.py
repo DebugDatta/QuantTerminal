@@ -13,8 +13,6 @@ Institutional quantitative predictive analytics terminal incorporating:
 - Quantitative Research Tearsheet CSV export
 """
 
-import os
-import sys
 import math
 import datetime
 import warnings
@@ -30,9 +28,6 @@ import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-
-# Ensure utils directory is in Python path
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "utils"))
 
 from utils.helper import (
     inject_custom_theme,

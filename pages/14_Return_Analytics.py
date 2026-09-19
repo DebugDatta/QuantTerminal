@@ -1,5 +1,3 @@
-import os
-import sys
 import math
 import numpy as np
 import pandas as pd
@@ -8,8 +6,6 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from scipy import stats
-
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "utils"))
 
 try:
     from utils.helper import (

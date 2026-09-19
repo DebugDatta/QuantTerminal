@@ -49,98 +49,48 @@ REVIEW-LATER (documented conflicts/dependencies; also surfaced in-page):
           documented momentum lookback maximum (756 trading days).
 """
 
-import os
-import sys
-
 import numpy as np
 import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-for _p in (ROOT, os.path.join(ROOT, "utils")):
-    if _p not in sys.path:
-        sys.path.append(_p)
-
-try:
-    from utils.helper import inject_custom_theme, load_data, fetch_stocks
-except ImportError:
-    from helper import inject_custom_theme, load_data, fetch_stocks
-
-try:
-    from factor.factors import (
-        momentum_factor,
-        trend_factor,
-        vol_factor,
-        reversal_factor,
-        liquidity_factor,
-        MOMENTUM_LOOKBACK,
-        MIN_MOMENTUM_LOOKBACK,
-        MAX_MOMENTUM_LOOKBACK,
-        MOMENTUM_SKIP_MONTHS,
-        MIN_MOMENTUM_SKIP,
-        MAX_MOMENTUM_SKIP,
-        TREND_FAST_WINDOW,
-        MIN_TREND_FAST,
-        MAX_TREND_FAST,
-        TREND_SLOW_WINDOW,
-        MIN_TREND_SLOW,
-        MAX_TREND_SLOW,
-        VOL_WINDOW,
-        MIN_VOL_WINDOW,
-        MAX_VOL_WINDOW,
-        VOL_ESTIMATORS,
-        REVERSAL_LOOKBACK,
-        MIN_REVERSAL_LOOKBACK,
-        MAX_REVERSAL_LOOKBACK,
-        LIQUIDITY_WINDOW,
-        MIN_LIQUIDITY_WINDOW,
-        MAX_LIQUIDITY_WINDOW,
-    )
-    from factor.scores import (
-        factor_rankings,
-        information_coefficient,
-        newey_west_lags,
-        RANKING_METHODS,
-        MIN_CROSS_SECTION,
-    )
-except ImportError:
-    from factors import (
-        momentum_factor,
-        trend_factor,
-        vol_factor,
-        reversal_factor,
-        liquidity_factor,
-        MOMENTUM_LOOKBACK,
-        MIN_MOMENTUM_LOOKBACK,
-        MAX_MOMENTUM_LOOKBACK,
-        MOMENTUM_SKIP_MONTHS,
-        MIN_MOMENTUM_SKIP,
-        MAX_MOMENTUM_SKIP,
-        TREND_FAST_WINDOW,
-        MIN_TREND_FAST,
-        MAX_TREND_FAST,
-        TREND_SLOW_WINDOW,
-        MIN_TREND_SLOW,
-        MAX_TREND_SLOW,
-        VOL_WINDOW,
-        MIN_VOL_WINDOW,
-        MAX_VOL_WINDOW,
-        VOL_ESTIMATORS,
-        REVERSAL_LOOKBACK,
-        MIN_REVERSAL_LOOKBACK,
-        MAX_REVERSAL_LOOKBACK,
-        LIQUIDITY_WINDOW,
-        MIN_LIQUIDITY_WINDOW,
-        MAX_LIQUIDITY_WINDOW,
-    )
-    from scores import (
-        factor_rankings,
-        information_coefficient,
-        newey_west_lags,
-        RANKING_METHODS,
-        MIN_CROSS_SECTION,
-    )
+from utils.helper import inject_custom_theme, load_data, fetch_stocks
+from factor.factors import (
+    momentum_factor,
+    trend_factor,
+    vol_factor,
+    reversal_factor,
+    liquidity_factor,
+    MOMENTUM_LOOKBACK,
+    MIN_MOMENTUM_LOOKBACK,
+    MAX_MOMENTUM_LOOKBACK,
+    MOMENTUM_SKIP_MONTHS,
+    MIN_MOMENTUM_SKIP,
+    MAX_MOMENTUM_SKIP,
+    TREND_FAST_WINDOW,
+    MIN_TREND_FAST,
+    MAX_TREND_FAST,
+    TREND_SLOW_WINDOW,
+    MIN_TREND_SLOW,
+    MAX_TREND_SLOW,
+    VOL_WINDOW,
+    MIN_VOL_WINDOW,
+    MAX_VOL_WINDOW,
+    VOL_ESTIMATORS,
+    REVERSAL_LOOKBACK,
+    MIN_REVERSAL_LOOKBACK,
+    MAX_REVERSAL_LOOKBACK,
+    LIQUIDITY_WINDOW,
+    MIN_LIQUIDITY_WINDOW,
+    MAX_LIQUIDITY_WINDOW,
+)
+from factor.scores import (
+    factor_rankings,
+    information_coefficient,
+    newey_west_lags,
+    RANKING_METHODS,
+    MIN_CROSS_SECTION,
+)
 
 EXCHANGE_OPTIONS = ("Auto", "NSE", "BSE", "Global")
 FACTOR_OPTIONS = ("Momentum", "Trend", "Volatility", "Reversal", "Liquidity")

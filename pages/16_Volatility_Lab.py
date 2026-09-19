@@ -1,5 +1,3 @@
-import os
-import sys
 import warnings
 
 import numpy as np
@@ -7,41 +5,17 @@ import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-for _p in (ROOT, os.path.join(ROOT, "utils")):
-    if _p not in sys.path:
-        sys.path.append(_p)
-
-try:
-    from utils.helper import (
-        inject_custom_theme,
-        load_data,
-        drop_holiday_nans,
-        fetch_stocks,
-    )
-    from utils.sidebar import render_sidebar
-except ImportError:
-    from helper import (
-        inject_custom_theme,
-        load_data,
-        drop_holiday_nans,
-        fetch_stocks,
-    )
-    from sidebar import render_sidebar
-
-try:
-    from core.returns import compute_returns
-except ImportError:
-    from returns import compute_returns
-
-try:
-    from volatility.estimators import historical_vol, ewma_vol, parkinson, gk, rs, yz
-    from volatility.garch import fit_garch, fit_egarch, fit_gjr_garch, DEFAULT_HORIZON
-    from risk.rolling import rolling_vol
-except ImportError:
-    from estimators import historical_vol, ewma_vol, parkinson, gk, rs, yz
-    from garch import fit_garch, fit_egarch, fit_gjr_garch, DEFAULT_HORIZON
-    from rolling import rolling_vol
+from utils.helper import (
+    inject_custom_theme,
+    load_data,
+    drop_holiday_nans,
+    fetch_stocks,
+)
+from utils.sidebar import render_sidebar
+from core.returns import compute_returns
+from volatility.estimators import historical_vol, ewma_vol, parkinson, gk, rs, yz
+from volatility.garch import fit_garch, fit_egarch, fit_gjr_garch, DEFAULT_HORIZON
+from risk.rolling import rolling_vol
 
 EXCHANGE_OPTIONS = ("Auto", "NSE", "BSE", "Global")
 GARCH_MODELS = ("GARCH", "EGARCH", "GJR-GARCH")

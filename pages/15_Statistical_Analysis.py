@@ -1,38 +1,17 @@
-import os
-import sys
-
 import numpy as np
 import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
 from scipy.cluster.hierarchy import dendrogram
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-for _p in (ROOT, os.path.join(ROOT, "utils")):
-    if _p not in sys.path:
-        sys.path.append(_p)
-
-try:
-    from utils.helper import inject_custom_theme, load_data, fetch_stocks
-except ImportError:
-    from helper import inject_custom_theme, load_data, fetch_stocks
-
-try:
-    from core.returns import compute_returns
-    from statistics.stationarity import adf_test, kpss_test, pp_test, zivot_andrews
-    from statistics.diagnostics import ljung_box, jarque_bera, shapiro_wilk
-    from statistics.correlation import correlation_matrix
-    from statistics.pca import pca_decomposition, scree_data
-    from statistics.clustering import kmeans_clustering, hierarchical_data
-    from statistics.timeseries import acf, pacf
-except ImportError:
-    from returns import compute_returns
-    from stationarity import adf_test, kpss_test, pp_test, zivot_andrews
-    from diagnostics import ljung_box, jarque_bera, shapiro_wilk
-    from correlation import correlation_matrix
-    from pca import pca_decomposition, scree_data
-    from clustering import kmeans_clustering, hierarchical_data
-    from timeseries import acf, pacf
+from utils.helper import inject_custom_theme, load_data, fetch_stocks
+from core.returns import compute_returns
+from statistics.stationarity import adf_test, kpss_test, pp_test, zivot_andrews
+from statistics.diagnostics import ljung_box, jarque_bera, shapiro_wilk
+from statistics.correlation import correlation_matrix
+from statistics.pca import pca_decomposition, scree_data
+from statistics.clustering import kmeans_clustering, hierarchical_data
+from statistics.timeseries import acf, pacf
 
 EXCHANGE_OPTIONS = ("Auto", "NSE", "BSE", "Global")
 ANALYSIS_TYPES = ("Stationarity", "Diagnostics", "Correlation", "PCA", "Clustering")
