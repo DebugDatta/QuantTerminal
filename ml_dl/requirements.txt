@@ -1,0 +1,23 @@
+# Core Numerical & Data Processing
+numpy>=1.26.0
+pandas>=2.2.0
+scipy>=1.13.0
+pyarrow>=15.0.0
+joblib>=1.3.0
+
+# Financial Market Data
+yfinance>=0.2.40
+
+# Classical & Tree-Based Machine Learning
+scikit-learn>=1.4.0
+xgboost>=2.0.0
+lightgbm>=4.3.0
+catboost>=1.2.0
+
+# Deep Learning (Recurrent Sequence Models)
+tensorflow>=2.16.0
+
+# Quantitative Visualization & Plotting
+matplotlib>=3.8.0
+seaborn>=0.13.0
+plotly>=5.20.0

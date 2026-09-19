@@ -1,24 +1,29 @@
-# Core Web Framework & Data Sources
+# Core Web Framework & Interface
 streamlit>=1.32.0
+
+# Financial Data Ingestion & Manipulation
 yfinance>=0.2.40
 pandas>=2.0.0
 numpy>=1.24.0
+pyarrow>=14.0.0
 
-# Visualization & Graphics
+# Interactive Financial Visualizations
 plotly>=5.18.0
 kaleido>=0.2.1
-Pillow>=10.0.0
 
-# Statistical Modeling & Econometrics
+# Statistical Modeling, Time Series & Econometrics
 statsmodels>=0.14.0
 scipy>=1.11.0
+stochastic>=0.6.0
+ta>=0.11.0
 
-# Machine Learning & Regime Detection
+# Machine Learning & Gradient Boosted Decision Trees
 scikit-learn>=1.3.0
 hmmlearn>=0.3.0
 ruptures>=1.1.8
 xgboost>=2.0.0
 lightgbm>=4.0.0
+catboost>=1.2.0
 arch>=6.0.0
 
 # Portfolio Optimization
@@ -27,10 +32,18 @@ PyPortfolioOpt>=1.5.5
 numba>=0.58.0
 joblib>=1.3.0
 
-# Deep Learning (Forecasting Models)
+# Deep Learning & Neural Network Backbones
 torch>=2.0.0
-tensorflow>=2.14.0
+tensorflow>=2.15.0
+keras>=3.0.0
+
+# Deep Reinforcement Learning & Trading OMS
+tensortrade>=1.0.4
+gymnasium>=0.29.0
 
 # Export & Reporting
 openpyxl>=3.1.0
 reportlab>=4.0.0
+pypdf>=4.0.0
+pymupdf>=1.24.0
+Pillow>=10.0.0

@@ -245,7 +245,7 @@ else:
     else:
         fig.update_xaxes(gridcolor="rgba(255,255,255,0.05)")
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     # ---------------------------------------------------------
     # 4. Company Fundamental Snapshot Tabs
@@ -275,4 +275,4 @@ else:
             st.info("No detailed company metadata available for this ticker.")
 
     with tab_data:
-        st.dataframe(chart_df.sort_index(ascending=False), use_container_width=True)
+        st.dataframe(chart_df.sort_index(ascending=False), width="stretch")

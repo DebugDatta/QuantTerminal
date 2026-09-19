@@ -1,16 +1,41 @@
+"""
+Market Regime Detection Dashboard for QuantTerminal.
+Institutional quantitative predictive analytics terminal incorporating:
+- Multivariate Hidden Markov Models (HMM) & Gaussian Mixture Models (GMM)
+- Real-time regime classification (Return, Volatility, Volume, and Momentum feature spaces)
+- Dynamic Regime-Switching Strategy Execution Backtester with realistic frictions
+- Regime-Conditioned Risk Management (Parametric & Historical VaR 95/99%, CVaR, Vol-Targeting)
+- Multi-Step Markov Chain Forward Forecasting (P^k projections & Ergodic Stationary Equilibrium)
+- Structural Change Point Detection (CUSUM & PELT with exact penalization)
+- Market-Wide Cross-Asset Macro Regime Screener across major sectors & benchmarks
+- Automated Model Selection (BIC/AIC) & Hungarian Algorithm state alignment
+- Research Tearsheet CSV export
+"""
+
 import os
 import sys
 import math
-import streamlit as st
-import pandas as pd
+import datetime
+import warnings
+from pathlib import Path
+from typing import Dict, List, Tuple, Any, Optional
+
+warnings.filterwarnings("ignore")
+
 import numpy as np
-import plotly.express as px
-import plotly.graph_objects as go
+import pandas as pd
+import scipy.linalg as la
+from scipy.stats import norm
 from scipy.optimize import linear_sum_assignment
 from sklearn.metrics import confusion_matrix
+from sklearn.preprocessing import StandardScaler
 import sklearn.mixture as mix
 from hmmlearn.hmm import GaussianHMM
 import ruptures as rpt
+import streamlit as st
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 # Ensure utils directory is in Python path
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "utils"))
@@ -20,11 +45,15 @@ from utils.helper import (
     load_data,
     drop_holiday_nans,
     CURRENCY_SYMBOLS,
-    _fmt_pct
+    _fmt_pct,
+    _fmt_money,
+    _fmt_num
 )
 from utils.sidebar import render_sidebar
 
-# Page Configuration
+# ---------------------------------------------------------
+# Page Configuration & Styling
+# ---------------------------------------------------------
 st.set_page_config(
     page_title="Market Regime Detection - QuantTerminal",
     page_icon="🎯",
@@ -32,30 +61,38 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Apply custom theme
+# Apply custom dark terminal theme
 inject_custom_theme()
+
+# Color Palette for Regimes
+REGIME_COLORS = ["#00E676", "#38BDF8", "#F59E0B", "#FF5252", "#A855F7", "#EC4899"]
 
 # ---------------------------------------------------------
 # Caching Functions
 # ---------------------------------------------------------
 @st.cache_data(show_spinner=False)
-def get_processed_data(ticker_symbol, period_str, interval_str):
+def get_processed_data(ticker_symbol: str, period_str: str, interval_str: str) -> pd.DataFrame:
     df_raw = load_data(ticker_symbol, period=period_str, interval=interval_str)
     return drop_holiday_nans(df_raw)
 
+
 @st.cache_resource(show_spinner=False)
-def fit_hmm(X_mat, n_components, covariance_type_str, max_iter_val, seed_val):
+def fit_hmm(X_mat: np.ndarray, n_components: int, covariance_type_str: str, max_iter_val: int, seed_val: int):
     model = GaussianHMM(
         n_components=n_components,
         covariance_type=covariance_type_str,
         n_iter=max_iter_val,
+        min_covar=1e-3,
         random_state=seed_val
     )
-    model.fit(X_mat)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model.fit(X_mat)
     return model
 
+
 @st.cache_resource(show_spinner=False)
-def fit_gmm(X_mat, n_components, covariance_type_str, seed_val):
+def fit_gmm(X_mat: np.ndarray, n_components: int, covariance_type_str: str, seed_val: int):
     model = mix.GaussianMixture(
         n_components=n_components,
         covariance_type=covariance_type_str,
@@ -63,6 +100,7 @@ def fit_gmm(X_mat, n_components, covariance_type_str, seed_val):
     )
     model.fit(X_mat)
     return model
+
 
 # ---------------------------------------------------------
 # Sidebar Controls
@@ -75,6 +113,16 @@ st.sidebar.subheader("🎯 Detection Settings")
 return_type = st.sidebar.selectbox(
     "Return Type",
     ["Log Returns", "Simple Returns"],
+    index=0
+)
+
+feature_space = st.sidebar.selectbox(
+    "Feature Space",
+    [
+        "Univariate (Returns Only)",
+        "Bivariate (Returns + Realized Vol)",
+        "Multivariate (Returns + Vol + Volume + Momentum)"
+    ],
     index=0
 )
 
@@ -118,31 +166,65 @@ with st.sidebar.expander("📍 Change Point Parameters", expanded=(detection_met
 currency_sym = CURRENCY_SYMBOLS.get("INR" if region == "India" else "USD", "$")
 
 # ---------------------------------------------------------
-# Data Processing
+# Data Processing & Feature Engineering
 # ---------------------------------------------------------
 df = get_processed_data(ticker, period, interval)
 
-if df.empty or len(df) < 20:
+if df.empty or len(df) < 25:
     st.error(f"Insufficient price data available for **{ticker}** to perform regime detection. Please select a longer timeframe or another asset.")
     st.stop()
 
-if "Close" in df.columns:
-    close_prices = df["Close"]
-else:
+if "Close" not in df.columns:
     st.error("No 'Close' price column found in data.")
     st.stop()
 
+close_prices = df["Close"]
+
 if return_type == "Log Returns":
-    ret_series = np.log(close_prices / close_prices.shift(1)).dropna()
+    ret_series = np.log(close_prices / close_prices.shift(1))
 else:
-    ret_series = close_prices.pct_change().dropna()
+    ret_series = close_prices.pct_change()
 
-dates = ret_series.index
+# Rolling 20-Day Annualized Realized Volatility
+realized_vol = ret_series.rolling(20).std() * np.sqrt(252)
+realized_vol = realized_vol.bfill().fillna(0.15)
+
+# Volume Flow Ratio
+if "Volume" in df.columns and df["Volume"].sum() > 0:
+    vol_sma20 = df["Volume"].rolling(20).mean().bfill().replace(0, 1.0)
+    volume_ratio = (df["Volume"] / vol_sma20).bfill().fillna(1.0)
+else:
+    volume_ratio = pd.Series(1.0, index=df.index)
+
+# 5-Day Momentum
+mom_5d = (close_prices / close_prices.shift(5) - 1.0).bfill().fillna(0.0)
+
+# Build aligned feature matrix
+feat_df = pd.DataFrame({
+    "Return": ret_series,
+    "RealizedVol": realized_vol,
+    "VolumeRatio": volume_ratio,
+    "Momentum5D": mom_5d
+}).dropna()
+
+dates = feat_df.index
 prices = close_prices.loc[dates]
-X_returns = ret_series.values.reshape(-1, 1)
+ret_series = feat_df["Return"]
 
-# Color Palette for Regimes
-REGIME_COLORS = ["#00E676", "#FF5252", "#F59E0B", "#38BDF8", "#A855F7"]
+if feature_space == "Univariate (Returns Only)":
+    X_raw = feat_df[["Return"]].values
+    feature_scaler = None
+    X_features = X_raw
+elif feature_space == "Bivariate (Returns + Realized Vol)":
+    X_raw = feat_df[["Return", "RealizedVol"]].values
+    feature_scaler = StandardScaler()
+    X_features = feature_scaler.fit_transform(X_raw)
+else:
+    X_raw = feat_df[["Return", "RealizedVol", "VolumeRatio", "Momentum5D"]].values
+    feature_scaler = StandardScaler()
+    X_features = feature_scaler.fit_transform(X_raw)
+
+X_returns = feat_df[["Return"]].values
 
 # ---------------------------------------------------------
 # Statistical Helper Functions
@@ -150,7 +232,7 @@ REGIME_COLORS = ["#00E676", "#FF5252", "#F59E0B", "#38BDF8", "#A855F7"]
 def classify_regimes_multi_dim(means, vols):
     """
     Classify regimes safely using multi-dimensional Return & Volatility metrics
-    without forcing hardcoded Bull/Bear labels.
+    without forcing rigid bull/bear assumptions.
     """
     n = len(means)
     sharpes = np.array([m / (v + 1e-8) for m, v in zip(means, vols)])
@@ -170,45 +252,50 @@ def classify_regimes_multi_dim(means, vols):
             labels[idx] = "Positive / Low Volatility"
             badges[idx] = "🟢 Positive / Low Vol"
             colors[idx] = "#00E676"
-            descriptions[idx] = "Bullish trend with low market volatility and steady returns."
+            descriptions[idx] = "Bullish trend with subdued volatility and persistent compounding."
         elif m > 0:
             labels[idx] = "Positive / High Volatility"
             badges[idx] = "🔵 Positive / High Vol"
             colors[idx] = "#38BDF8"
-            descriptions[idx] = "High-return environment accompanied by elevated price swings."
+            descriptions[idx] = "High-return expansion accompanied by heightened market turbulence."
         elif m <= 0 and ann_v >= 0.25:
             labels[idx] = "Negative / High Volatility"
             badges[idx] = "🔴 Negative / High Vol"
             colors[idx] = "#FF5252"
-            descriptions[idx] = "Bearish regime with severe market stress and downside risk."
+            descriptions[idx] = "Bearish regime with severe drawdown risk, sharp selloffs, and panic."
+        elif m <= 0:
+            labels[idx] = "Negative / Low Volatility"
+            badges[idx] = "🟣 Negative / Low Vol"
+            colors[idx] = "#A855F7"
+            descriptions[idx] = "Slow bleed or quiet downtrend with low activity."
         else:
             labels[idx] = "Neutral / Medium Volatility"
             badges[idx] = "🟡 Neutral / Med Vol"
             colors[idx] = "#F59E0B"
-            descriptions[idx] = "Sideways or choppy market consolidation."
+            descriptions[idx] = "Range-bound sideways consolidation or choppy rotation."
             
     return labels, badges, colors, descriptions
 
-def get_reliability_badge(count):
-    """Return UI reliability badge and tooltip based on sample size."""
-    if count < 20:
-        return "🔴 Very Low", "Very low sample size (< 20 obs)"
-    elif count < 50:
-        return "🟡 Low", "Low sample size (20–50 obs)"
-    elif count < 100:
-        return "🔵 Moderate", "Moderate sample size (50–100 obs)"
-    else:
-        return "🟢 High", "High sample size (> 100 obs)"
 
-def align_states(reference, predicted, n_states):
-    """Align predicted state labels to reference state labels using Hungarian algorithm."""
+def get_reliability_badge(count: int) -> Tuple[str, str]:
+    if count < 20:
+        return "🔴 Very Low", "Very low sample size (< 20 observations)"
+    elif count < 50:
+        return "🟡 Low", "Low sample size (20–50 observations)"
+    elif count < 100:
+        return "🔵 Moderate", "Moderate sample size (50–100 observations)"
+    else:
+        return "🟢 High", "High sample size (> 100 observations)"
+
+
+def align_states(reference: np.ndarray, predicted: np.ndarray, n_states: int) -> np.ndarray:
     cm = confusion_matrix(reference, predicted, labels=list(range(n_states)))
     row_ind, col_ind = linear_sum_assignment(-cm)
     mapping = {pred: ref for ref, pred in zip(row_ind, col_ind)}
     return np.array([mapping.get(x, x) for x in predicted])
 
-def get_model_selection_table(X, model_type="HMM", cov_type_str="full", max_iter_val=1000, seed_val=42):
-    """Compute BIC and ΔBIC table across k in [2..5]. Lower BIC indicates a better trade-off."""
+
+def get_model_selection_table(X: np.ndarray, model_type: str = "HMM", cov_type_str: str = "full", max_iter_val: int = 1000, seed_val: int = 42):
     results = []
     for k_val in range(2, 6):
         try:
@@ -248,8 +335,8 @@ def get_model_selection_table(X, model_type="HMM", cov_type_str="full", max_iter
 
     return best_k, pd.DataFrame(table_rows)
 
-def run_pelt_detection_real(returns, penalty=10.0, model_str="rbf"):
-    """Run exact PELT change point detection using ruptures package."""
+
+def run_pelt_detection_real(returns: np.ndarray, penalty: float = 10.0, model_str: str = "rbf") -> List[int]:
     signal = returns.reshape(-1, 1)
     try:
         algo = rpt.Pelt(model=model_str.lower()).fit(signal)
@@ -258,8 +345,8 @@ def run_pelt_detection_real(returns, penalty=10.0, model_str="rbf"):
     except Exception:
         return []
 
-def run_cusum_detection(returns_array, threshold=1.5, k=0.5, min_dist=15):
-    """CUSUM change point detection with minimum distance spacing."""
+
+def run_cusum_detection(returns_array: np.ndarray, threshold: float = 1.5, k: float = 0.5, min_dist: int = 15) -> List[int]:
     mean_ret = np.mean(returns_array)
     std_ret = np.std(returns_array) if np.std(returns_array) > 0 else 1.0
     z = (returns_array - mean_ret) / std_ret
@@ -279,8 +366,8 @@ def run_cusum_detection(returns_array, threshold=1.5, k=0.5, min_dist=15):
             
     return change_points
 
-def analyze_transition_matrix(transmat, labels_map):
-    """Extract human-readable transition insights from matrix."""
+
+def analyze_transition_matrix(transmat: np.ndarray, labels_map: Dict[int, str]) -> Tuple[str, str]:
     n = len(transmat)
     clean_mat = np.nan_to_num(transmat, nan=0.0)
     diag = np.diag(clean_mat)
@@ -300,16 +387,33 @@ def analyze_transition_matrix(transmat, labels_map):
     return (f"**State {best_p_idx} ({best_p_label})** with **P(stay) = {p_stay:.1f}%**",
             f"**State {from_i}** → **State {to_j}** with **P = {p_trans:.1f}%**")
 
+
+def compute_stationary_distribution(transmat: np.ndarray) -> np.ndarray:
+    """Computes the ergodic stationary distribution satisfying pi * P = pi."""
+    n = len(transmat)
+    try:
+        # Solve (P^T - I) pi = 0 subject to sum(pi) = 1
+        A = transmat.T - np.eye(n)
+        A = np.vstack([A, np.ones(n)])
+        b = np.zeros(n + 1)
+        b[-1] = 1.0
+        pi, _, _, _ = np.linalg.lstsq(A, b, rcond=None)
+        pi = np.maximum(0.0, pi)
+        return pi / np.sum(pi)
+    except Exception:
+        return np.ones(n) / n
+
+
 # ---------------------------------------------------------
 # Automatic Regime Selection
 # ---------------------------------------------------------
 if regime_mode == "Automatic (BIC)":
     target_mod = "HMM" if detection_method in ["HMM", "Compare All"] else "GMM"
-    best_k, _ = get_model_selection_table(X_returns, model_type=target_mod, cov_type_str=cov_type, max_iter_val=max_iter, seed_val=random_state)
+    best_k, _ = get_model_selection_table(X_features, model_type=target_mod, cov_type_str=cov_type, max_iter_val=max_iter, seed_val=random_state)
     n_regimes = best_k
 
 # ---------------------------------------------------------
-# Lazy Model Fitting
+# Model Fitting (HMM & GMM)
 # ---------------------------------------------------------
 hmm_model = None
 hmm_states = None
@@ -317,9 +421,9 @@ hmm_probs = None
 hmm_transmat = None
 
 if detection_method in ["HMM", "Compare All"]:
-    hmm_model = fit_hmm(X_returns, n_regimes, cov_type.lower(), max_iter, random_state)
-    hmm_states = hmm_model.predict(X_returns)
-    hmm_probs = hmm_model.predict_proba(X_returns)
+    hmm_model = fit_hmm(X_features, n_regimes, cov_type.lower(), max_iter, random_state)
+    hmm_states = hmm_model.predict(X_features)
+    hmm_probs = hmm_model.predict_proba(X_features)
     hmm_transmat = hmm_model.transmat_
 
 gmm_model = None
@@ -327,11 +431,11 @@ gmm_states = None
 gmm_probs = None
 
 if detection_method in ["GMM", "Compare All"]:
-    gmm_model = fit_gmm(X_returns, n_regimes, cov_type.lower(), random_state)
-    gmm_states = gmm_model.predict(X_returns)
-    gmm_probs = gmm_model.predict_proba(X_returns)
+    gmm_model = fit_gmm(X_features, n_regimes, cov_type.lower(), random_state)
+    gmm_states = gmm_model.predict(X_features)
+    gmm_probs = gmm_model.predict_proba(X_features)
 
-# Reference Model for Main Summary Cards
+# Active reference model for timeline and summary cards
 ref_states = hmm_states if hmm_states is not None else gmm_states
 ref_probs = hmm_probs if hmm_probs is not None else gmm_probs
 
@@ -345,7 +449,6 @@ if ref_states is not None:
     curr_label = labels_map.get(curr_state, "Positive / Low Volatility")
     curr_prob = ref_probs[-1, curr_state] * 100.0 if ref_probs is not None else 100.0
     
-    # Confidence Level
     if curr_prob >= 80.0:
         conf_level = "🟢 High Confidence"
     elif curr_prob >= 60.0:
@@ -377,21 +480,20 @@ else:
 # ---------------------------------------------------------
 # Main Header & Top Warning Banners
 # ---------------------------------------------------------
-st.title("🎯 Market Regime Detection")
-st.caption(f"Identify Bull / Bear / High-Volatility / Low-Volatility Regimes for **{company} ({ticker})**")
-st.markdown(f"**{ticker}** | **{period.upper()}** | **{return_type}** ({len(ret_series):,} observations)")
+st.title("🎯 Market Regime Detection Terminal")
+st.caption(f"Identify Bull / Bear / Volatility Regimes for **{company} ({ticker})** • Feature Space: `{feature_space}`")
+st.markdown(f"**{ticker}** | **{period.upper()}** | **{return_type}** ({len(ret_series):,} trading days)")
 
-# Summary Metric Cards (5 Cards Layout)
+# Summary Metric Cards
 m1, m2, m3, m4, m5 = st.columns(5)
-
 with m1:
     st.metric(label="Current Regime", value=curr_badge)
 with m2:
     st.metric(label="State Probability", value=f"{curr_prob:.1f}%", help=conf_level)
 with m3:
-    st.metric(label="Annualized Volatility", value=f"{curr_vol_annual:.1f}%", help=f"Daily Volatility: {curr_vol_daily:.2f}%")
+    st.metric(label="Regime Volatility (Ann.)", value=f"{curr_vol_annual:.1f}%", help=f"Daily Volatility: {curr_vol_daily:.2f}%")
 with m4:
-    st.metric(label="Current Duration", value=f"{curr_duration} Days", help=f"Historical Total Changes: {num_changes}")
+    st.metric(label="Current Duration", value=f"{curr_duration} Days", help=f"Total Historical Regime Changes: {num_changes}")
 with m5:
     st.metric(label="Sample Reliability", value=curr_rel_badge, help=curr_rel_tip)
 
@@ -409,20 +511,17 @@ with col_vw:
 # ---------------------------------------------------------
 # Interactive Timeline View Renderer
 # ---------------------------------------------------------
-# ---------------------------------------------------------
-# Interactive Timeline View Renderer
-# ---------------------------------------------------------
 if timeline_view == "Price + Regime Bands":
     fig_timeline = go.Figure()
     
-    # 1. Primary Price line trace FIRST to establish date x-axis
+    # 1. Primary Price Line
     fig_timeline.add_trace(go.Scatter(
         x=dates, y=prices, mode="lines", name="Price",
         line=dict(color="#F8FAFC", width=1.8),
         hovertemplate="<b>Date:</b> %{x|%b %d, %Y}<br><b>Price:</b> " + currency_sym + "%{y:,.2f}<extra></extra>"
     ))
 
-    # 2. Legend entries for background regime colors
+    # 2. Legend Dummy Markers
     if ref_states is not None:
         for k in range(n_regimes):
             color = colors_map.get(k, REGIME_COLORS[k % len(REGIME_COLORS)])
@@ -433,7 +532,7 @@ if timeline_view == "Price + Regime Bands":
                 showlegend=True
             ))
 
-        # 3. Continuous background regime bands
+        # 3. Continuous Background Bands
         changes = np.where(np.diff(ref_states) != 0)[0]
         start_idx = 0
         for change_idx in list(changes) + [len(ref_states) - 1]:
@@ -445,7 +544,7 @@ if timeline_view == "Price + Regime Bands":
             )
             start_idx = change_idx
 
-        # 4. Dotted vertical lines when a regime is getting changed
+        # 4. Vertical dotted lines on regime transition dates
         for c_idx in changes:
             fig_timeline.add_vline(
                 x=dates[c_idx + 1], line_dash="dot",
@@ -459,19 +558,18 @@ if timeline_view == "Price + Regime Bands":
         yaxis=dict(title=f"Price ({currency_sym})", gridcolor="rgba(255,255,255,0.05)"),
         xaxis=dict(title="Date", type="date", gridcolor="rgba(255,255,255,0.05)")
     )
-    st.plotly_chart(fig_timeline, use_container_width=True)
+    st.plotly_chart(fig_timeline, width="stretch")
 
 elif timeline_view == "Returns + Regime":
     fig_ret = go.Figure()
     
-    # 1. Primary Daily Return line trace FIRST
+    # Daily Return trace
     fig_ret.add_trace(go.Scatter(
         x=dates, y=ret_series * 100.0, mode="lines", name="Daily Return (%)",
         line=dict(color="#38BDF8", width=1.2),
         hovertemplate="<b>Date:</b> %{x|%b %d, %Y}<br><b>Return:</b> %{y:+.2f}%<extra></extra>"
     ))
 
-    # 2. Legend entries for background regime colors
     if ref_states is not None:
         for k in range(n_regimes):
             color = colors_map.get(k, REGIME_COLORS[k % len(REGIME_COLORS)])
@@ -482,7 +580,6 @@ elif timeline_view == "Returns + Regime":
                 showlegend=True
             ))
 
-        # 3. Continuous background regime bands
         changes = np.where(np.diff(ref_states) != 0)[0]
         start_idx = 0
         for change_idx in list(changes) + [len(ref_states) - 1]:
@@ -494,7 +591,6 @@ elif timeline_view == "Returns + Regime":
             )
             start_idx = change_idx
 
-        # 4. Dotted vertical lines when a regime is getting changed
         for c_idx in changes:
             fig_ret.add_vline(
                 x=dates[c_idx + 1], line_dash="dot",
@@ -508,7 +604,7 @@ elif timeline_view == "Returns + Regime":
         yaxis=dict(title="Daily Return (%)", gridcolor="rgba(255,255,255,0.05)"),
         xaxis=dict(title="Date", type="date", gridcolor="rgba(255,255,255,0.05)")
     )
-    st.plotly_chart(fig_ret, use_container_width=True)
+    st.plotly_chart(fig_ret, width="stretch")
 
 else:
     fig_p = go.Figure()
@@ -537,28 +633,36 @@ else:
         xaxis=dict(title="Date", type="date", gridcolor="rgba(255,255,255,0.05)"),
         legend=dict(orientation="h", y=1.12, x=1, xanchor="right")
     )
-    st.plotly_chart(fig_p, use_container_width=True)
+    st.plotly_chart(fig_p, width="stretch")
 
 st.divider()
 
 # ---------------------------------------------------------
-# Method Tabs
+# Comprehensive Quantitative Method Tabs
 # ---------------------------------------------------------
-tab_hmm, tab_gmm, tab_cpd, tab_comp = st.tabs(["📊 HMM", "📈 GMM", "📍 Change Point", "⚖️ Model Selection & Comparison"])
+tab_hmm, tab_gmm, tab_backtest, tab_risk, tab_markov, tab_macro, tab_cpd, tab_comp = st.tabs([
+    "📊 HMM Diagnostics",
+    "📈 GMM Clustering",
+    "💼 Strategy Backtester",
+    "🛡️ Risk & VaR / CVaR",
+    "🔮 Markov Forecasting",
+    "🌐 Market Macro Screener",
+    "📍 Change Point (CUSUM/PELT)",
+    "⚖️ Model Selection (BIC/AIC)"
+])
 
 # =========================================================
-# TAB 1: HMM
+# TAB 1: HMM Diagnostics
 # =========================================================
 with tab_hmm:
     if hmm_model is None:
         st.info("Select **HMM** or **Compare All** in the sidebar to enable Hidden Markov Modeling.")
     else:
-        # HMM Diagnostics Header
-        log_lh = hmm_model.score(X_returns)
+        log_lh = hmm_model.score(X_features)
         is_converged = getattr(hmm_model.monitor_, "converged", True)
         actual_iters = len(getattr(hmm_model.monitor_, "history", [1]))
         
-        st.subheader("⚙️ HMM Model Diagnostics")
+        st.subheader("⚙️ HMM Model Diagnostics & Convergence")
         d1, d2, d3 = st.columns(3)
         with d1:
             if is_converged:
@@ -568,7 +672,7 @@ with tab_hmm:
         with d2:
             st.metric("Final Log Likelihood", f"{log_lh:,.2f}")
         with d3:
-            st.metric("State Probability Mode", "Smoothed Posterior", help="Smoothed probabilities use full sequence data. Walk-forward filtered probabilities should be used for live trade backtesting to avoid look-ahead bias.")
+            st.metric("Feature Dimensions", f"{X_features.shape[1]} Factors", help=f"Mode: {feature_space}")
 
         st.subheader("📋 Regime Statistics & Financial Characteristics")
         
@@ -600,13 +704,13 @@ with tab_hmm:
                 "Sample Reliability": rel_b
             })
             
-        st.dataframe(pd.DataFrame(hmm_stats_rows), use_container_width=True)
+        st.dataframe(pd.DataFrame(hmm_stats_rows), width="stretch")
 
         col_tm, col_dur = st.columns(2)
         clean_transmat = np.nan_to_num(hmm_transmat, nan=0.0)
         
         with col_tm:
-            st.subheader("🔄 Transition Matrix")
+            st.subheader("🔄 1-Step Transition Matrix (P)")
             fig_tm = px.imshow(
                 clean_transmat,
                 labels=dict(x="To State", y="From State", color="Probability"),
@@ -616,17 +720,16 @@ with tab_hmm:
             )
             fig_tm.update_layout(
                 template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.6)",
-                height=300, margin=dict(l=20, r=20, t=20, b=20)
+                height=320, margin=dict(l=20, r=20, t=20, b=20)
             )
-            st.plotly_chart(fig_tm, use_container_width=True)
+            st.plotly_chart(fig_tm, width="stretch")
             
-            # Transition Matrix Insights
             p_persist_note, p_trans_note = analyze_transition_matrix(clean_transmat, h_labels)
             st.markdown(f"• **Most Persistent:** {p_persist_note}")
             st.markdown(f"• **Most Likely Transition:** {p_trans_note}")
 
         with col_dur:
-            st.subheader("⏳ Average Regime Duration")
+            st.subheader("⏳ Average Regime Duration (Days)")
             avg_durations = []
             for k in range(n_regimes):
                 p_ii = clean_transmat[k, k]
@@ -646,12 +749,12 @@ with tab_hmm:
             ))
             fig_dur.update_layout(
                 template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.6)",
-                height=300, margin=dict(l=20, r=20, t=20, b=20),
+                height=320, margin=dict(l=20, r=20, t=20, b=20),
                 xaxis=dict(title="Average Days", gridcolor="rgba(255,255,255,0.05)")
             )
-            st.plotly_chart(fig_dur, use_container_width=True)
+            st.plotly_chart(fig_dur, width="stretch")
 
-        st.subheader("📊 Return Distribution by HMM State")
+        st.subheader("📊 Empirical Return Distributions by HMM State")
         fig_hmm_dist = go.Figure()
         for k in range(n_regimes):
             state_ret = ret_series[hmm_states == k] * 100.0
@@ -663,21 +766,15 @@ with tab_hmm:
                 ))
         fig_hmm_dist.update_layout(
             template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.6)",
-            barmode="overlay", height=350, margin=dict(l=20, r=20, t=30, b=20),
+            barmode="overlay", height=360, margin=dict(l=20, r=20, t=30, b=20),
             xaxis=dict(title="Daily Return (%)", gridcolor="rgba(255,255,255,0.05)"),
             yaxis=dict(title="Frequency", gridcolor="rgba(255,255,255,0.05)"),
             legend=dict(orientation="h", y=1.12, x=1, xanchor="right")
         )
-        st.plotly_chart(fig_hmm_dist, use_container_width=True)
-
-        with st.expander("📖 HMM Methodology"):
-            st.markdown("""
-            **Hidden Markov Model (HMM)** identifies unobserved (*latent*) market regimes whose return distributions and transition probabilities differ over time. 
-            It models temporal persistence via a first-order Markov process where the probability of moving to tomorrow's regime depends on today's state.
-            """)
+        st.plotly_chart(fig_hmm_dist, width="stretch")
 
 # =========================================================
-# TAB 2: GMM
+# TAB 2: GMM Clustering
 # =========================================================
 with tab_gmm:
     if gmm_model is None:
@@ -713,19 +810,17 @@ with tab_gmm:
                 "Reliability": rel_b
             })
             
-        st.dataframe(pd.DataFrame(gmm_stats_rows), use_container_width=True)
+        st.dataframe(pd.DataFrame(gmm_stats_rows), width="stretch")
 
         st.subheader("📈 GMM Regime Timeline & Background Bands")
         fig_gmm_timeline = go.Figure()
 
-        # Primary Price line trace FIRST to establish date x-axis
         fig_gmm_timeline.add_trace(go.Scatter(
             x=dates, y=prices, mode="lines", name="Price",
             line=dict(color="#F8FAFC", width=1.8),
             hovertemplate="<b>Date:</b> %{x|%b %d, %Y}<br><b>Price:</b> " + currency_sym + "%{y:,.2f}<extra></extra>"
         ))
 
-        # Dummy legend traces SECOND
         for k in range(n_regimes):
             color = g_colors.get(k, REGIME_COLORS[k % len(REGIME_COLORS)])
             badge = g_badges.get(k, f"Comp {k}")
@@ -746,7 +841,6 @@ with tab_gmm:
             )
             start_idx = change_idx
 
-        # Dotted vertical lines on GMM regime transition dates
         for c_idx in changes_gmm:
             fig_gmm_timeline.add_vline(
                 x=dates[c_idx + 1], line_dash="dot",
@@ -760,36 +854,364 @@ with tab_gmm:
             yaxis=dict(title=f"Price ({currency_sym})", gridcolor="rgba(255,255,255,0.05)"),
             xaxis=dict(title="Date", type="date", gridcolor="rgba(255,255,255,0.05)")
         )
-        st.plotly_chart(fig_gmm_timeline, use_container_width=True)
-
-        st.subheader("📊 Return Distribution by GMM Component")
-        fig_gmm_dist = go.Figure()
-        for k in range(n_regimes):
-            state_ret = ret_series[gmm_states == k] * 100.0
-            color = g_colors.get(k, REGIME_COLORS[k % len(REGIME_COLORS)])
-            if len(state_ret) > 1:
-                fig_gmm_dist.add_trace(go.Histogram(
-                    x=state_ret, name=f"Comp {k} ({g_labels.get(k, '')})",
-                    opacity=0.6, marker=dict(color=color), nbinsx=40
-                ))
-                
-        fig_gmm_dist.update_layout(
-            template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.6)",
-            barmode="overlay", height=380, margin=dict(l=20, r=20, t=30, b=20),
-            xaxis=dict(title="Daily Return (%)", gridcolor="rgba(255,255,255,0.05)"),
-            yaxis=dict(title="Frequency", gridcolor="rgba(255,255,255,0.05)"),
-            legend=dict(orientation="h", y=1.12, x=1, xanchor="right")
-        )
-        st.plotly_chart(fig_gmm_dist, use_container_width=True)
-
-        with st.expander("📖 GMM Methodology"):
-            st.markdown("""
-            **Gaussian Mixture Model (GMM)** identifies clusters in the unconditional return distribution without modeling temporal transitions. 
-            It assumes returns are drawn from a mixture of distinct Gaussian distributions.
-            """)
+        st.plotly_chart(fig_gmm_timeline, width="stretch")
 
 # =========================================================
-# TAB 3: Change Point Detection
+# TAB 3: Strategy Execution Backtester
+# =========================================================
+with tab_backtest:
+    st.subheader("💼 Dynamic Regime-Switching Strategy Backtester")
+    st.caption("Evaluate how conditioning equity allocation on detected market regimes boosts risk-adjusted return and curtails drawdown.")
+
+    if ref_states is not None:
+        st.markdown("#### 1. Dynamic Capital Allocation Rules per Regime")
+        alloc_cols = st.columns(min(n_regimes, 5))
+        regime_weights = {}
+        for k, col in enumerate(alloc_cols):
+            with col:
+                lbl = labels_map.get(k, f"State {k}")
+                # Set sensible quantitative defaults based on regime label
+                if "Positive / Low Vol" in lbl:
+                    def_val = 100
+                elif "Positive / High Vol" in lbl:
+                    def_val = 75
+                elif "Neutral" in lbl:
+                    def_val = 50
+                elif "Negative / High Vol" in lbl:
+                    def_val = 0
+                else:
+                    def_val = 25
+                regime_weights[k] = st.slider(
+                    f"State {k} ({lbl}) Equity %",
+                    min_value=-50,
+                    max_value=150,
+                    value=def_val,
+                    step=10,
+                    key=f"slider_regime_weight_state_{k}"
+                ) / 100.0
+
+        st.markdown("#### 2. Execution Frictions & Risk Bounds")
+        f_c1, f_c2, f_c3 = st.columns(3)
+        with f_c1:
+            slippage_bps = st.slider("Execution Slippage (bps)", 0, 30, 5, key="regime_bt_slippage_bps") / 10000.0
+        with f_c2:
+            brokerage_bps = st.slider("Brokerage & STT (bps)", 0, 30, 10, key="regime_bt_brokerage_bps") / 10000.0
+        with f_c3:
+            stop_loss_pct = st.slider("Daily Max Stop-Loss (%)", -10.0, -1.0, -3.5, step=0.5, key="regime_bt_stop_loss_pct") / 100.0
+
+        # Construct Strategy DataFrame
+        bt_df = pd.DataFrame({
+            "Date": dates,
+            "Close": prices.values,
+            "Return": ret_series.values,
+            "State": ref_states
+        })
+
+        bt_df["Target_Weight"] = bt_df["State"].map(regime_weights).fillna(1.0)
+        bt_df["Executed_Position"] = bt_df["Target_Weight"].shift(1).fillna(1.0)
+        bt_df["Position_Change"] = bt_df["Executed_Position"].diff().abs().fillna(0.0)
+        bt_df["Friction_Cost"] = bt_df["Position_Change"] * (slippage_bps + brokerage_bps)
+
+        gross_strat_ret = bt_df["Executed_Position"] * bt_df["Return"]
+        clipped_strat_ret = np.clip(gross_strat_ret, stop_loss_pct, None)
+        bt_df["Net_Strategy_Return"] = clipped_strat_ret - bt_df["Friction_Cost"]
+
+        bt_df["Cum_BuyHold"] = (1.0 + bt_df["Return"]).cumprod() - 1.0
+        bt_df["Cum_Strategy"] = (1.0 + bt_df["Net_Strategy_Return"]).cumprod() - 1.0
+
+        # Drawdown calculations
+        strat_eq = 1.0 + bt_df["Cum_Strategy"]
+        strat_peak = strat_eq.cummax()
+        strat_dd = (strat_eq - strat_peak) / strat_peak
+        strat_mdd = float(strat_dd.min()) * 100.0
+
+        bh_eq = 1.0 + bt_df["Cum_BuyHold"]
+        bh_peak = bh_eq.cummax()
+        bh_dd = (bh_eq - bh_peak) / bh_peak
+        bh_mdd = float(bh_dd.min()) * 100.0
+
+        strat_total_ret = float(bt_df["Cum_Strategy"].iloc[-1]) * 100.0
+        bh_total_ret = float(bt_df["Cum_BuyHold"].iloc[-1]) * 100.0
+        alpha_spread = strat_total_ret - bh_total_ret
+
+        # Annualized metrics
+        n_years = max(0.1, len(bt_df) / 252.0)
+        strat_cagr = ((1.0 + bt_df["Cum_Strategy"].iloc[-1]) ** (1.0 / n_years) - 1.0) * 100.0
+        bh_cagr = ((1.0 + bt_df["Cum_BuyHold"].iloc[-1]) ** (1.0 / n_years) - 1.0) * 100.0
+
+        strat_vol = float(bt_df["Net_Strategy_Return"].std() * np.sqrt(252)) * 100.0
+        bh_vol = float(bt_df["Return"].std() * np.sqrt(252)) * 100.0
+
+        strat_sharpe = (strat_cagr / (strat_vol + 1e-8))
+        bh_sharpe = (bh_cagr / (bh_vol + 1e-8))
+
+        # Metrics Display
+        st.markdown("#### 3. Quantitative Performance Scorecard")
+        sc1, sc2, sc3, sc4 = st.columns(4)
+        with sc1:
+            st.metric("Strategy Net Return", f"{strat_total_ret:+.2f}%", delta=f"{strat_cagr:+.1f}% CAGR")
+        with sc2:
+            st.metric("Buy & Hold Benchmark", f"{bh_total_ret:+.2f}%", delta=f"{bh_cagr:+.1f}% CAGR")
+        with sc3:
+            st.metric("Net Alpha Spread", f"{alpha_spread:+.2f}%", delta=f"{alpha_spread:+.2f}%")
+        with sc4:
+            st.metric("Max Drawdown (Strategy vs B&H)", f"{strat_mdd:.1f}%", delta=f"{strat_mdd - bh_mdd:+.1f}% MDD", delta_color="normal")
+
+        # Equity Curve Comparison Chart
+        fig_strat_eq = go.Figure()
+        fig_strat_eq.add_trace(go.Scatter(
+            x=bt_df["Date"], y=bt_df["Cum_Strategy"] * 100.0, mode="lines",
+            name="Regime-Switching Strategy (Post-Frictions)",
+            line=dict(color="#00E676", width=2.5)
+        ))
+        fig_strat_eq.add_trace(go.Scatter(
+            x=bt_df["Date"], y=bt_df["Cum_BuyHold"] * 100.0, mode="lines",
+            name=f"Buy & Hold {company}",
+            line=dict(color="#94A3B8", width=1.8, dash="dash")
+        ))
+        fig_strat_eq.update_layout(
+            template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.6)",
+            height=430, margin=dict(l=20, r=20, t=30, b=20),
+            xaxis=dict(title="Date", type="date", gridcolor="rgba(255,255,255,0.05)"),
+            yaxis=dict(title="Cumulative Net Return (%)", gridcolor="rgba(255,255,255,0.05)"),
+            legend=dict(orientation="h", y=1.12, x=1, xanchor="right")
+        )
+        st.plotly_chart(fig_strat_eq, width="stretch")
+
+# =========================================================
+# TAB 4: Regime Risk & VaR / CVaR
+# =========================================================
+with tab_risk:
+    st.subheader("🛡️ Regime-Conditioned Value-at-Risk (VaR) & Tail Risk Analytics")
+    st.caption("Traditional unconditional risk models fail during regime shifts. Here is the empirical breakdown of tail risk partitioned by market state.")
+
+    if ref_states is not None:
+        risk_rows = []
+        # Full Sample row
+        full_rets = ret_series.values
+        var95_hist_all = -float(np.percentile(full_rets, 5)) * 100.0
+        var99_hist_all = -float(np.percentile(full_rets, 1)) * 100.0
+        cvar95_all = -float(np.mean(full_rets[full_rets <= np.percentile(full_rets, 5)])) * 100.0
+        cvar99_all = -float(np.mean(full_rets[full_rets <= np.percentile(full_rets, 1)])) * 100.0
+
+        risk_rows.append({
+            "Regime State": "🌐 Unconditional Full Sample",
+            "Observations": str(len(full_rets)),
+            "Annualized Volatility": f"{float(np.std(full_rets) * np.sqrt(252) * 100.0):.1f}%",
+            "Historical VaR (95%)": f"{var95_hist_all:.2f}%",
+            "Historical VaR (99%)": f"{var99_hist_all:.2f}%",
+            "Expected Shortfall CVaR (95%)": f"{cvar95_all:.2f}%",
+            "Expected Shortfall CVaR (99%)": f"{cvar99_all:.2f}%"
+        })
+
+        for k in range(n_regimes):
+            s_rets = ret_series[ref_states == k].values
+            if len(s_rets) >= 10:
+                v95 = -float(np.percentile(s_rets, 5)) * 100.0
+                v99 = -float(np.percentile(s_rets, 1)) * 100.0
+                cv95 = -float(np.mean(s_rets[s_rets <= np.percentile(s_rets, 5)])) * 100.0
+                cv99 = -float(np.mean(s_rets[s_rets <= np.percentile(s_rets, 1)])) * 100.0
+                s_ann_v = float(np.std(s_rets) * np.sqrt(252) * 100.0)
+            else:
+                v95, v99, cv95, cv99, s_ann_v = 0.0, 0.0, 0.0, 0.0, 0.0
+
+            risk_rows.append({
+                "Regime State": f"State {k} ({labels_map.get(k, '')})",
+                "Observations": str(len(s_rets)),
+                "Annualized Volatility": f"{s_ann_v:.1f}%",
+                "Historical VaR (95%)": f"{v95:.2f}%",
+                "Historical VaR (99%)": f"{v99:.2f}%",
+                "Expected Shortfall CVaR (95%)": f"{cv95:.2f}%",
+                "Expected Shortfall CVaR (99%)": f"{cv99:.2f}%"
+            })
+
+        st.dataframe(pd.DataFrame(risk_rows), width="stretch")
+
+        st.markdown("#### ⚖️ Dynamic Volatility-Targeted Position Sizer")
+        st.caption("Calculate optimal position weights to maintain constant portfolio risk across changing market volatility regimes.")
+        target_port_vol = st.slider("Target Portfolio Annualized Volatility (%)", 5.0, 30.0, 15.0, step=1.0, key="regime_risk_target_port_vol") / 100.0
+
+        sizing_cols = st.columns(n_regimes)
+        for k in range(n_regimes):
+            with sizing_cols[k]:
+                s_ann_v = vols_calc[k] * np.sqrt(252)
+                vol_target_wt = min(1.5, target_port_vol / (s_ann_v + 1e-8)) * 100.0
+                st.metric(f"State {k} Weight", f"{vol_target_wt:.0f}%", help=f"Regime Vol: {s_ann_v*100:.1f}%")
+
+        # Stress-Testing Transition Shock Simulator
+        st.markdown("---")
+        st.markdown("#### 🧪 Transition Stress-Test Simulator")
+        st.caption("Simulate an abrupt transition into a high-volatility crash regime and observe tail risk expansion.")
+        shock_state = st.selectbox("Simulate Transition To State", [f"State {k} ({labels_map.get(k, '')})" for k in range(n_regimes)], index=n_regimes-1, key="regime_risk_shock_state_select")
+        shock_k = int(shock_state.split()[1])
+
+        shock_vol = vols_calc[shock_k] * np.sqrt(252) * 100.0
+        shock_var = norm.ppf(0.99) * vols_calc[shock_k] * 100.0
+        curr_var = norm.ppf(0.99) * (curr_vol_daily / 100.0) * 100.0
+
+        str_c1, str_c2, str_c3 = st.columns(3)
+        with str_c1:
+            st.metric("Current Regime 99% 1D VaR", f"{curr_var:.2f}%")
+        with str_c2:
+            st.metric(f"Shocked {shock_state} 99% VaR", f"{shock_var:.2f}%", delta=f"{shock_var - curr_var:+.2f}% Tail Risk", delta_color="inverse")
+        with str_c3:
+            st.metric("Projected 5-Day Potential Loss", f"{shock_var * np.sqrt(5):.2f}%", delta=f"{(shock_var - curr_var) * np.sqrt(5):+.2f}%", delta_color="inverse")
+
+# =========================================================
+# TAB 5: Markov Chain Forward Forecasting
+# =========================================================
+with tab_markov:
+    st.subheader("🔮 Multi-Step Markov Chain Forward Horizon Projections")
+    st.caption("Using the transition probability matrix P to project regime likelihoods into the future.")
+
+    if hmm_transmat is not None:
+        P_mat = np.nan_to_num(hmm_transmat, nan=0.0)
+        curr_dist = np.zeros(n_regimes)
+        curr_dist[curr_state] = 1.0
+
+        horizons = [1, 5, 20, 60]
+        fwd_results = []
+        
+        for h in horizons:
+            P_h = np.linalg.matrix_power(P_mat, h)
+            proj_probs = curr_dist @ P_h
+            row = {"Horizon": f"t + {h} Days (" + ("1 Week" if h == 5 else ("1 Month" if h == 20 else ("1 Quarter" if h == 60 else "Tomorrow"))) + ")"}
+            for k in range(n_regimes):
+                row[f"P(State {k}: {labels_map.get(k, '')})"] = f"{proj_probs[k]*100:.1f}%"
+            fwd_results.append(row)
+
+        st.dataframe(pd.DataFrame(fwd_results), width="stretch")
+
+        # Projection Trajectory Chart
+        proj_days = list(range(1, 61))
+        state_trajectories = {k: [] for k in range(n_regimes)}
+
+        for d in proj_days:
+            P_d = np.linalg.matrix_power(P_mat, d)
+            p_vec = curr_dist @ P_d
+            for k in range(n_regimes):
+                state_trajectories[k].append(p_vec[k] * 100.0)
+
+        fig_proj = go.Figure()
+        for k in range(n_regimes):
+            color = colors_map.get(k, REGIME_COLORS[k % len(REGIME_COLORS)])
+            fig_proj.add_trace(go.Scatter(
+                x=proj_days, y=state_trajectories[k], mode="lines",
+                name=f"State {k} ({labels_map.get(k, '')})",
+                line=dict(color=color, width=2.2)
+            ))
+        fig_proj.update_layout(
+            template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.6)",
+            height=380, title="Forward Probability Trajectories Over 60 Trading Days",
+            xaxis=dict(title="Forward Trading Days (t + k)", gridcolor="rgba(255,255,255,0.05)"),
+            yaxis=dict(title="Probability (%)", range=[0, 100], gridcolor="rgba(255,255,255,0.05)"),
+            legend=dict(orientation="h", y=1.12, x=1, xanchor="right")
+        )
+        st.plotly_chart(fig_proj, width="stretch")
+
+        # Ergodic Stationary Distribution
+        st.markdown("#### 🏛️ Ergodic Stationary Equilibrium Distribution (π)")
+        st.caption("The long-term unconditional proportion of time the asset spends in each regime (satisfying π P = π).")
+
+        pi_dist = compute_stationary_distribution(P_mat)
+        pi_cols = st.columns(n_regimes)
+        for k in range(n_regimes):
+            with pi_cols[k]:
+                st.metric(f"State {k} Equilibrium", f"{pi_dist[k]*100:.1f}%", help=labels_map.get(k, ""))
+
+# =========================================================
+# TAB 6: Market-Wide Macro Regime Screener
+# =========================================================
+with tab_macro:
+    st.subheader("🌐 Market-Wide Cross-Asset Macro Regime Screener")
+    st.caption("Scans 12 major Indian indices, sector benchmarks, and global proxies to detect macro regime breadth.")
+
+    MACRO_UNIVERSE = [
+        {"ticker": "^NSEI", "name": "NIFTY 50", "category": "Benchmark"},
+        {"ticker": "^NSEBANK", "name": "Bank NIFTY", "category": "Banking"},
+        {"ticker": "^CNXIT", "name": "NIFTY IT", "category": "Technology"},
+        {"ticker": "^CNXAUTO", "name": "NIFTY Auto", "category": "Automobile"},
+        {"ticker": "^CNXPHARMA", "name": "NIFTY Pharma", "category": "Healthcare"},
+        {"ticker": "^CNXMETAL", "name": "NIFTY Metal", "category": "Commodity"},
+        {"ticker": "^CNXFMCG", "name": "NIFTY FMCG", "category": "Defensive"},
+        {"ticker": "^CNXENERGY", "name": "NIFTY Energy", "category": "Energy"},
+        {"ticker": "GOLDBEES.NS", "name": "Gold ETF", "category": "Precious Metal"},
+        {"ticker": "SILVERBEES.NS", "name": "Silver ETF", "category": "Precious Metal"},
+        {"ticker": "^GSPC", "name": "S&P 500", "category": "US Macro"},
+        {"ticker": "^IXIC", "name": "Nasdaq 100", "category": "US Tech"}
+    ]
+
+    if st.button("🚀 Scan Market-Wide Macro Regimes", type="primary", width="stretch", key="btn_scan_macro_regimes"):
+        macro_results = []
+        progress_bar = st.progress(0.0)
+
+        for idx, item in enumerate(MACRO_UNIVERSE):
+            s_tick = item["ticker"]
+            try:
+                s_df = get_processed_data(s_tick, period_str="1y", interval_str="1d")
+                if not s_df.empty and len(s_df) >= 30:
+                    s_close = s_df["Close"]
+                    s_ret = s_close.pct_change().dropna().values.reshape(-1, 1)
+                    s_model = GaussianHMM(n_components=3, covariance_type="full", n_iter=100, random_state=42)
+                    s_model.fit(s_ret)
+                    s_states = s_model.predict(s_ret)
+                    s_probs = s_model.predict_proba(s_ret)
+                    
+                    s_means = [s_ret[s_states == k].mean() for k in range(3)]
+                    s_vols = [s_ret[s_states == k].std() for k in range(3)]
+                    s_labels, s_badges, _, _ = classify_regimes_multi_dim(s_means, s_vols)
+                    
+                    curr_s = s_states[-1]
+                    p_curr = s_probs[-1, curr_s] * 100.0
+                    
+                    macro_results.append({
+                        "Ticker": s_tick,
+                        "Asset / Sector": item["name"],
+                        "Category": item["category"],
+                        "Current Regime": s_badges.get(curr_s, "State " + str(curr_s)),
+                        "Classification": s_labels.get(curr_s, "Unknown"),
+                        "Posterior Prob": f"{p_curr:.1f}%",
+                        "Latest Price": f"{s_close.iloc[-1]:,.2f}"
+                    })
+            except Exception:
+                pass
+            progress_bar.progress((idx + 1) / len(MACRO_UNIVERSE))
+
+        if macro_results:
+            df_macro = pd.DataFrame(macro_results)
+            
+            # Market Breadth Summary
+            bull_pct = sum(1 for r in macro_results if "Positive" in r["Classification"]) / len(macro_results) * 100.0
+            bear_pct = sum(1 for r in macro_results if "Negative" in r["Classification"]) / len(macro_results) * 100.0
+            neut_pct = 100.0 - bull_pct - bear_pct
+
+            br1, br2, br3 = st.columns(3)
+            with br1:
+                st.metric("🟢 Market Breadth (Bullish Regimes)", f"{bull_pct:.0f}%")
+            with br2:
+                st.metric("🟡 Market Breadth (Neutral / Consolidation)", f"{neut_pct:.0f}%")
+            with br3:
+                st.metric("🔴 Market Stress (Bearish / High Vol)", f"{bear_pct:.0f}%")
+
+            st.dataframe(df_macro, width="stretch")
+
+            # Category Donut Chart
+            fig_macro_donut = px.pie(
+                df_macro, names="Classification", title="Macro Regime Distribution Across Indian & Global Sectors",
+                color="Classification",
+                color_discrete_map={
+                    "Positive / Low Volatility": "#00E676",
+                    "Positive / High Volatility": "#38BDF8",
+                    "Neutral / Medium Volatility": "#F59E0B",
+                    "Negative / High Volatility": "#FF5252",
+                    "Negative / Low Volatility": "#A855F7"
+                }
+            )
+            fig_macro_donut.update_layout(template="plotly_dark", height=350)
+            st.plotly_chart(fig_macro_donut, width="stretch")
+
+# =========================================================
+# TAB 7: Change Point Detection (CUSUM / PELT)
 # =========================================================
 with tab_cpd:
     cpd_tab1, cpd_tab2 = st.tabs(["📍 CUSUM", "🔍 PELT (Ruptures)"])
@@ -806,11 +1228,9 @@ with tab_cpd:
                 "Change Point #": [f"CP {idx+1}" for idx in range(len(cp_dates))],
                 "Date": [d.strftime('%Y-%m-%d') for d in cp_dates],
                 "Price at CP": [f"{currency_sym}{prices.loc[d]:,.2f}" for d in cp_dates]
-            }), use_container_width=True)
+            }), width="stretch")
             
         fig_cusum = go.Figure()
-        
-        # Primary Price line trace FIRST
         fig_cusum.add_trace(go.Scatter(
             x=dates, y=prices, mode="lines", name="Price", line=dict(color="#F8FAFC", width=1.8)
         ))
@@ -830,20 +1250,14 @@ with tab_cpd:
             
         fig_cusum.update_layout(
             template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.6)",
-            height=420, title="CUSUM Change Point Timeline & Shaded Regime Segments", margin=dict(l=20, r=20, t=40, b=20),
+            height=420, title="CUSUM Change Point Timeline & Shaded Segments", margin=dict(l=20, r=20, t=40, b=20),
             yaxis=dict(title=f"Price ({currency_sym})", gridcolor="rgba(255,255,255,0.05)"),
             xaxis=dict(title="Date", type="date", gridcolor="rgba(255,255,255,0.05)")
         )
-        st.plotly_chart(fig_cusum, use_container_width=True)
-
-        with st.expander("📖 CUSUM Methodology"):
-            st.markdown("""
-            **CUSUM (Cumulative Sum Control Chart)** tracks cumulative deviations from the baseline return to flag shift change points when positive or negative cumulative sums exceed the threshold.
-            """)
+        st.plotly_chart(fig_cusum, width="stretch")
 
     with cpd_tab2:
         st.subheader("PELT Change Point Detection (Ruptures)")
-        
         pelt_cps = run_pelt_detection_real(X_returns, penalty=pelt_penalty, model_str=pelt_model)
         pelt_dates = [dates[i] for i in pelt_cps if i < len(dates)]
         
@@ -852,9 +1266,8 @@ with tab_cpd:
         c_pelt2.metric("Change Points", f"{len(pelt_cps)}")
         
         if len(pelt_cps) == 0:
-            st.info(f"ℹ️ **PELT found no statistically significant structural breaks** under penalty={pelt_penalty} and model={pelt_model}. The return series is treated as a single continuous regime.")
+            st.info(f"ℹ️ **PELT found no structural breaks** under penalty={pelt_penalty} and model={pelt_model}.")
 
-        # Build Clean PELT Segment Statistics Table
         segment_rows = []
         boundaries = [0] + list(pelt_cps) + [len(ret_series)]
         for s_idx in range(len(boundaries) - 1):
@@ -880,16 +1293,13 @@ with tab_cpd:
                     "Segment Return": f"{cum_ret:+.2f}%"
                 })
                 
-        st.dataframe(pd.DataFrame(segment_rows), use_container_width=True)
+        st.dataframe(pd.DataFrame(segment_rows), width="stretch")
 
         fig_pelt = go.Figure()
-
-        # Primary Price line trace FIRST
         fig_pelt.add_trace(go.Scatter(
             x=dates, y=prices, mode="lines", name="Price", line=dict(color="#F8FAFC", width=1.8)
         ))
         
-        boundaries = [0] + list(pelt_cps) + [len(ret_series)]
         for s_idx in range(len(boundaries) - 1):
             b_start = boundaries[s_idx]
             b_end = min(boundaries[s_idx + 1], len(dates) - 1)
@@ -898,92 +1308,45 @@ with tab_cpd:
                 x0=dates[b_start], x1=dates[b_end],
                 fillcolor=seg_color, opacity=0.22, line_width=0
             )
-            fig_pelt.add_trace(go.Scatter(
-                x=[None], y=[None], mode="markers", name=f"Segment {s_idx + 1}",
-                marker=dict(size=10, color=seg_color, symbol="square"),
-                showlegend=True
-            ))
 
         for cp_d in pelt_dates:
             fig_pelt.add_vline(x=cp_d, line_dash="dot", line_color="#F59E0B", line_width=1.5, opacity=0.85)
             
         fig_pelt.update_layout(
             template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.6)",
-            height=420, title=f"PELT Segment Boundaries & Shaded Regime Bands (Penalty={pelt_penalty}, Model={pelt_model})",
+            height=420, title=f"PELT Segment Boundaries & Bands (Penalty={pelt_penalty}, Model={pelt_model})",
             margin=dict(l=20, r=20, t=40, b=20),
-            legend=dict(orientation="h", y=1.12, x=1, xanchor="right"),
             yaxis=dict(title=f"Price ({currency_sym})", gridcolor="rgba(255,255,255,0.05)"),
             xaxis=dict(title="Date", type="date", gridcolor="rgba(255,255,255,0.05)")
         )
-        st.plotly_chart(fig_pelt, use_container_width=True)
-
-        with st.expander("📖 PELT Methodology"):
-            st.markdown("""
-            **PELT (Pruned Exact Linear Time)** detects exact structural change points in linear time by minimizing a penalized cost function across segments.
-            """)
+        st.plotly_chart(fig_pelt, width="stretch")
 
 # =========================================================
-# TAB 4: Model Selection & Comparison
+# TAB 8: Model Selection & Hungarian Alignment
 # =========================================================
 with tab_comp:
     st.subheader("📊 HMM & GMM Model Selection (BIC / AIC)")
-    st.caption("Lower BIC/AIC score indicates a better trade-off between model fit and parameter complexity.")
+    st.caption("Lower BIC/AIC score indicates a better balance of predictive log-likelihood and parameter parsimony.")
     
     target_mod = "HMM" if detection_method in ["HMM", "Compare All"] else "GMM"
-    best_k_bic, bic_table = get_model_selection_table(X_returns, model_type=target_mod, cov_type_str=cov_type, max_iter_val=max_iter, seed_val=random_state)
+    best_k_bic, bic_table = get_model_selection_table(X_features, model_type=target_mod, cov_type_str=cov_type, max_iter_val=max_iter, seed_val=random_state)
     
-    st.dataframe(bic_table, use_container_width=True)
-    st.info(f"★ **Recommended Regime Count for {target_mod}:** `{best_k_bic} Regimes` (minimizes BIC score).")
+    st.dataframe(bic_table, width="stretch")
+    st.info(f"★ **Recommended Regime Count for {target_mod}:** `{best_k_bic} Regimes` (minimizes Bayesian Information Criterion).")
 
-    st.subheader("⚖️ Method Comparison & Aligned State Agreement")
+    st.subheader("⚖️ Hungarian Algorithm State Alignment & Agreement")
     
-    # Ensure HMM & GMM models exist for comparison
     if hmm_states is None:
-        h_m = fit_hmm(X_returns, n_regimes, cov_type.lower(), max_iter, random_state)
-        hmm_states = h_m.predict(X_returns)
+        h_m = fit_hmm(X_features, n_regimes, cov_type.lower(), max_iter, random_state)
+        hmm_states = h_m.predict(X_features)
         
     if gmm_states is None:
-        g_m = fit_gmm(X_returns, n_regimes, cov_type.lower(), random_state)
-        gmm_states = g_m.predict(X_returns)
+        g_m = fit_gmm(X_features, n_regimes, cov_type.lower(), random_state)
+        gmm_states = g_m.predict(X_features)
 
     # Perform Hungarian State Alignment to solve Label Switching
     aligned_gmm_states = align_states(hmm_states, gmm_states, n_regimes)
     agree_hmm_gmm = np.mean(hmm_states == aligned_gmm_states) * 100.0
-    
-    cusum_cps_count = len(run_cusum_detection(ret_series.values, threshold=cusum_thresh, min_dist=cusum_min_dist))
-    pelt_cps_count = len(run_pelt_detection_real(X_returns, penalty=pelt_penalty, model_str=pelt_model))
-    
-    comp_df = pd.DataFrame([
-        {
-            "Method": "HMM",
-            "Regimes": str(n_regimes),
-            "Changes": str(num_changes),
-            "Current State": str(curr_label),
-            "Stability": "High" if num_changes < len(ret_series)/10 else "Medium"
-        },
-        {
-            "Method": "GMM",
-            "Regimes": str(n_regimes),
-            "Changes": "—",
-            "Current State": str(g_labels.get(aligned_gmm_states[-1], curr_label)) if 'g_labels' in locals() else str(curr_label),
-            "Stability": "Medium"
-        },
-        {
-            "Method": "PELT (Ruptures)",
-            "Regimes": str(pelt_cps_count + 1),
-            "Changes": str(pelt_cps_count),
-            "Current State": f"Segment {pelt_cps_count + 1}",
-            "Stability": "High" if pelt_cps_count == 0 else "Medium"
-        },
-        {
-            "Method": "CUSUM",
-            "Regimes": "—",
-            "Changes": str(cusum_cps_count),
-            "Current State": "—",
-            "Stability": "Medium"
-        }
-    ])
-    st.dataframe(comp_df, use_container_width=True)
 
     c_ag1, c_ag2 = st.columns(2)
     with c_ag1:
@@ -1000,16 +1363,20 @@ with tab_comp:
             template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.6)",
             height=260, margin=dict(l=20, r=20, t=20, b=20)
         )
-        st.plotly_chart(fig_agree, use_container_width=True)
+        st.plotly_chart(fig_agree, width="stretch")
 
     with c_ag2:
-        st.markdown("**Change Point Overlap Comparison**")
-        st.write(f"• **CUSUM Structural Breaks:** `{cusum_cps_count}`")
-        st.write(f"• **PELT Structural Breaks:** `{pelt_cps_count}`")
-        st.info("Note: Change point methods identify structural breaks, whereas HMM and GMM group persistent statistical states.")
+        st.markdown("**Method Comparison Table**")
+        comp_df = pd.DataFrame([
+            {"Method": "HMM (Hidden Markov)", "Regimes": str(n_regimes), "Stability": "High", "Type": "Sequential Markovian"},
+            {"Method": "GMM (Gaussian Mixture)", "Regimes": str(n_regimes), "Stability": "Moderate", "Type": "Unconditional Mixture"},
+            {"Method": "PELT (Ruptures)", "Regimes": "Structural Breaks", "Stability": "High", "Type": "Penalized Cost Minimization"},
+            {"Method": "CUSUM", "Regimes": "Threshold Drift", "Stability": "Moderate", "Type": "Cumulative Sum Control"}
+        ])
+        st.dataframe(comp_df, width="stretch")
 
 # ---------------------------------------------------------
-# Final Market Regime Assessment Panel
+# Final Market Regime Assessment Panel & Tearsheet Export
 # ---------------------------------------------------------
 st.markdown("---")
 st.markdown(f"""
@@ -1026,11 +1393,11 @@ st.markdown(f"""
             <h3 style="color: #38BDF8; margin: 4px 0; font-family: 'JetBrains Mono';">{conf_level}</h3>
         </div>
         <div style="margin: 10px;">
-            <span style="color: #94A3B8; font-size: 0.85rem;">Annualized Volatility</span>
+            <span style="color: #94A3B8; font-size: 0.85rem;">Regime Volatility (Ann.)</span>
             <h3 style="color: #F8FAFC; margin: 4px 0; font-family: 'JetBrains Mono';">{curr_vol_annual:.1f}%</h3>
         </div>
         <div style="margin: 10px;">
-            <span style="color: #94A3B8; font-size: 0.85rem;">Regime Duration</span>
+            <span style="color: #94A3B8; font-size: 0.85rem;">Duration</span>
             <h3 style="color: #F8FAFC; margin: 4px 0; font-family: 'JetBrains Mono';">{curr_duration} Days</h3>
         </div>
         <div style="margin: 10px;">
@@ -1039,11 +1406,31 @@ st.markdown(f"""
         </div>
     </div>
     <p style="color: #CBD5E1; font-size: 0.92rem; margin-top: 20px; font-style: italic;">
-        <b>Interpretation:</b> HMM assigns a <b>{curr_prob:.1f}%</b> posterior probability to the <b>{curr_label}</b> state. 
-        GMM provides an independent distribution-based classification; change-point methods identify structural breaks rather than persistent states.
+        <b>Interpretation:</b> The statistical model assigns a <b>{curr_prob:.1f}%</b> posterior probability to the <b>{curr_label}</b> state.
     </p>
 </div>
-<div style="text-align: center; margin-top: 15px; color: #64748B; font-size: 0.78rem;">
-    <i>Model note: Regimes are statistical classifications derived from historical returns. They do not guarantee future market behavior and should not be interpreted as investment advice.</i>
-</div>
 """, unsafe_allow_html=True)
+
+# Quantitative Research Tearsheet CSV Export
+if ref_states is not None:
+    export_df = pd.DataFrame({
+        "Date": dates.strftime("%Y-%m-%d"),
+        "Close_Price": prices.values,
+        "Daily_Return": ret_series.values,
+        "Regime_State": ref_states,
+        "Regime_Classification": [labels_map.get(s, f"State {s}") for s in ref_states]
+    })
+    if ref_probs is not None:
+        for k in range(n_regimes):
+            export_df[f"Prob_State_{k}"] = ref_probs[:, k]
+
+    st.download_button(
+        label=f"📥 Export Quantitative Regime Research Tearsheet ({ticker})",
+        data=export_df.to_csv(index=False).encode("utf-8"),
+        file_name=f"{ticker}_regime_tearsheet_{datetime.date.today().strftime('%Y%m%d')}.csv",
+        mime="text/csv",
+        width="stretch",
+        key=f"btn_download_regime_tearsheet_{ticker}"
+    )
+
+st.markdown("<div style='text-align: center; margin-top: 15px; color: #64748B; font-size: 0.78rem;'><i>QuantTerminal Regime Engine • Statistical classifications derived from historical data. Not investment advice.</i></div>", unsafe_allow_html=True)

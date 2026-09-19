@@ -103,9 +103,11 @@ def render_sidebar():
     )
     st.session_state["stock_option"] = selected_option
 
-    row = filtered_stocks.loc[
-        filtered_stocks["Option_Label"] == selected_option
-    ].iloc[0]
+    matches = filtered_stocks.loc[filtered_stocks["Option_Label"] == selected_option]
+    if not matches.empty:
+        row = matches.iloc[0]
+    else:
+        row = filtered_stocks.iloc[0]
 
     symbol = str(row["Symbol"]).strip()
     company = str(row["Description"]).strip()

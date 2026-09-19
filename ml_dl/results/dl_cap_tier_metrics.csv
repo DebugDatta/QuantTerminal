@@ -1,0 +1,13 @@
+Model,Tier,IC,Directional_Accuracy (%),Sharpe
+GRU,Mega/Large Cap,0.0821,55.4,0.582
+GRU,Mid Cap,0.0745,54.1,0.51
+GRU,Small Cap,0.0612,53.15,0.442
+BiLSTM,Mega/Large Cap,0.071,54.8,0.515
+BiLSTM,Mid Cap,0.0632,53.6,0.46
+BiLSTM,Small Cap,0.052,52.8,0.395
+LSTM,Mega/Large Cap,0.059,54.1,0.45
+LSTM,Mid Cap,0.051,53.0,0.405
+LSTM,Small Cap,0.0415,52.1,0.355
+Simple RNN,Mega/Large Cap,0.026,52.5,0.34
+Simple RNN,Mid Cap,0.0195,51.8,0.295
+Simple RNN,Small Cap,0.011,51.1,0.245

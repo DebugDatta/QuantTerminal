@@ -1,16 +1,36 @@
+"""
+Quantitative Backtesting & Algorithmic Validation Terminal for QuantTerminal.
+Institutional backtesting and strategy validation platform incorporating:
+- Zero Look-Ahead Execution: Close(t) -> Open(t+1) with commission & slippage deductions
+- 10 Quantitative Trading Strategies across trend, mean-reversion, breakout, and momentum
+- 10-Strategy Tournament Leaderboard (cross-sectional ranking on the active timeframe)
+- Dynamic Risk Management Overlays (Fixed Stop-Loss, Trailing Stop-Loss, Take-Profit targets)
+- Monte Carlo Trade Resampling Engine (1,000 reshuffled trade paths & Drawdown Breach Probabilities)
+- Market Factor Attribution (Jensen's Alpha, Market Beta, Up-Market & Down-Market Capture Ratios)
+- Chronological 3-Way Walk-Forward Split (Train 60% / Val 20% / Test 20%) & Deflated Sharpe Ratio (DSR)
+- Parameter Sensitivity 2D Grid Heatmaps
+- Timestamped Trade Order Log & CSV Research Tearsheet Export
+"""
+
 import os
 import sys
 import math
 import datetime
+import warnings
+from pathlib import Path
+from typing import Dict, List, Tuple, Any, Optional
+
+warnings.filterwarnings("ignore")
+
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
+from sklearn.mixture import GaussianMixture
+from hmmlearn.hmm import GaussianHMM
 import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from sklearn.mixture import GaussianMixture
-from hmmlearn.hmm import GaussianHMM
 
 # Ensure utils directory is in Python path
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "utils"))
@@ -28,10 +48,10 @@ from utils.helper import (
 from utils.sidebar import render_sidebar
 
 # ---------------------------------------------------------
-# Page Configuration
+# Page Configuration & Styling
 # ---------------------------------------------------------
 st.set_page_config(
-    page_title="Backtesting - QuantTerminal",
+    page_title="Backtesting & Validation - QuantTerminal",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -44,127 +64,116 @@ inject_custom_theme()
 # Data Caching Functions
 # ---------------------------------------------------------
 @st.cache_data(show_spinner=False)
-def get_processed_data(ticker_symbol, period_str="max", interval_str="1d"):
+def get_processed_data(ticker_symbol: str, period_str: str = "max", interval_str: str = "1d") -> pd.DataFrame:
     df_raw = load_data(ticker_symbol, period=period_str, interval=interval_str)
     return drop_holiday_nans(df_raw)
+
 
 # ---------------------------------------------------------
 # Sidebar Controls
 # ---------------------------------------------------------
 ticker, company, exchange, period, interval, region = render_sidebar()
-
 currency_sym = CURRENCY_SYMBOLS.get("INR" if region == "India" else "USD", "$")
 
+st.sidebar.divider()
+st.sidebar.subheader("⚙️ Backtest Settings")
+
+position_mode = st.sidebar.radio(
+    "Position Mode",
+    ["Long Only", "Long & Short"],
+    index=0,
+    help="Long Only: Opens long on buy, closes to cash on sell (SEBI retail compliant). Long & Short: Allows short selling.",
+    key="sb_bt_pos_mode_radio"
+)
+
+initial_capital = st.sidebar.number_input(
+    "Initial Capital",
+    min_value=1000.0,
+    value=100000.0,
+    step=10000.0,
+    key="sb_bt_capital_num"
+)
+
+commission_pct = st.sidebar.slider(
+    "Commission (%)",
+    min_value=0.0,
+    max_value=0.50,
+    value=0.10,
+    step=0.01,
+    help="Per-trade brokerage & transaction tax.",
+    key="sb_bt_comm_slider"
+) / 100.0
+
+slippage_pct = st.sidebar.slider(
+    "Slippage (%)",
+    min_value=0.0,
+    max_value=0.50,
+    value=0.10,
+    step=0.01,
+    help="Execution price impact.",
+    key="sb_bt_slip_slider"
+) / 100.0
+
+total_cost_per_trade = commission_pct + slippage_pct
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("🎯 Strategy Selection")
+
+selected_strat = st.sidebar.selectbox(
+    "Trading Strategy",
+    [
+        "SMA Crossover",
+        "EMA Crossover",
+        "RSI Strategy",
+        "MACD Strategy",
+        "Bollinger Bands Strategy",
+        "Donchian Breakout",
+        "Momentum Strategy",
+        "Mean Reversion Strategy (Z-Score)",
+        "Breakout Strategy",
+        "Buy & Hold"
+    ],
+    index=0,
+    key="sb_bt_strat_select"
+)
+
+bench_default = "^NSEI" if region == "India" else "^GSPC"
+bench_name_default = "NIFTY 50 (^NSEI)" if region == "India" else "S&P 500 (^GSPC)"
+
+benchmark_choice = st.sidebar.selectbox(
+    "Market Benchmark",
+    [bench_name_default, "Buy & Hold Asset", "None"],
+    index=0,
+    key="sb_bt_bench_select"
+)
+
 # ---------------------------------------------------------
-# Header & Context Banners
+# Load Primary Asset Historical Data
 # ---------------------------------------------------------
-st.title("📊 Backtesting & Strategy Validation")
-st.caption("Evaluate trading strategies on historical data using realistic execution costs, position constraints and out-of-sample validation.")
-
-st.warning("⚠️ **Simulation Disclaimer:** Backtest results are historical simulations, not predictions. Results are reported net of commission and slippage by default. **Signal:** Close(t) → **Execution:** Open(t+1).")
-
-with st.expander("🛡️ Backtest Integrity & Realism Checklist", expanded=False):
-    c_chk1, c_chk2 = st.columns(2)
-    with c_chk1:
-        st.markdown("• **✓ Close(t) → Open(t+1):** Zero look-ahead bias.")
-        st.markdown("• **✓ Commission & Slippage:** Net returns after execution costs.")
-        st.markdown("• **✓ Chronological Split:** 60% Train / 20% Val / 20% Test.")
-        st.markdown("• **✓ SEBI Compliance:** Long-only short restrictions for Indian equities.")
-    with c_chk2:
-        st.markdown("• **✓ Liquidity Filtering:** Minimum volume threshold applied.")
-        st.markdown("• **✓ Benchmark Comparison:** Strategy vs Buy & Hold vs Market Index.")
-        st.markdown("• **✓ Multiple-Testing Adjustment:** Deflated Sharpe Ratio (DSR).")
-        st.markdown("• **✓ Regime Conditioning:** Performance sliced by market regimes.")
-
-st.markdown("---")
-
-# ---------------------------------------------------------
-# Configuration Section (2-Row Grid)
-# ---------------------------------------------------------
-st.subheader("⚙️ Backtest Configuration")
-
-# Row 1 Configuration
-c_r1_1, c_r1_2, c_r1_3, c_r1_4 = st.columns(4)
-
-with c_r1_1:
-    st.text_input("Selected Asset", value=f"{company} ({ticker})", disabled=True)
-
-with c_r1_2:
-    selected_strat = st.selectbox(
-        "Trading Strategy",
-        [
-            "SMA Crossover",
-            "EMA Crossover",
-            "RSI Strategy",
-            "MACD Strategy",
-            "Bollinger Bands Strategy",
-            "Donchian Breakout",
-            "Momentum Strategy",
-            "Mean Reversion Strategy (Z-Score)",
-            "Breakout Strategy",
-            "Buy & Hold"
-        ],
-        index=0
-    )
-
-with c_r1_3:
-    position_mode = st.radio(
-        "Position Mode",
-        ["Long Only", "Long & Short"],
-        index=0,
-        horizontal=True
-    )
-
-with c_r1_4:
-    bench_default = "^NSEI" if region == "India" else "^GSPC"
-    bench_name_default = "NIFTY 50 (^NSEI)" if region == "India" else "S&P 500 (^GSPC)"
-    benchmark_choice = st.selectbox(
-        "Market Benchmark",
-        [bench_name_default, "Buy & Hold Asset", "None"],
-        index=0
-    )
-
-# Load primary asset historical dataset
 df_raw = get_processed_data(ticker, period_str="max", interval_str="1d")
 if df_raw.empty or len(df_raw) < 30:
-    st.error(f"Insufficient data available for **{ticker}** to perform backtest.")
+    st.error(f"Insufficient historical data available for **{ticker}** to perform backtest.")
     st.stop()
 
 min_data_date = df_raw.index[0].to_pydatetime().date()
 max_data_date = df_raw.index[-1].to_pydatetime().date()
 default_start = max(min_data_date, max_data_date - datetime.timedelta(days=5*365))
 
-# Row 2 Configuration
-c_r2_1, c_r2_2, c_r2_3, c_r2_4 = st.columns(4)
+# Top Configuration Grid
+st.title("📊 Backtesting & Quantitative Validation Suite")
+st.caption(f"Rigorous Strategy Backtesting & Institutional Validation for **{company} ({ticker})** | Timing: **Close(t) → Open(t+1)**")
 
-with c_r2_1:
-    start_date = st.date_input("Start Date", value=default_start, min_value=min_data_date, max_value=max_data_date)
-
-with c_r2_2:
-    end_date = st.date_input("End Date", value=max_data_date, min_value=min_data_date, max_value=max_data_date)
-
-with c_r2_3:
-    initial_capital = st.number_input("Initial Capital", min_value=1000.0, value=10000.0, step=1000.0)
-
-with c_r2_4:
-    st.text_input("Execution Model", value="Next Open (t+1)", disabled=True)
-
-# ---------------------------------------------------------
-# Trading Assumptions & Cost Controls Expander
-# ---------------------------------------------------------
-with st.expander("⚙️ Execution Assumptions & Cost Controls", expanded=False):
-    c_ac1, c_ac2, c_ac3 = st.columns(3)
-    with c_ac1:
-        commission_pct = st.slider("Commission (%)", 0.0, 0.50, 0.10, step=0.01) / 100.0
-        slippage_pct = st.slider("Slippage (%)", 0.0, 0.50, 0.10, step=0.01) / 100.0
-        total_cost_per_trade = commission_pct + slippage_pct
-        st.markdown(f"**Total Expected Cost:** `~{total_cost_per_trade*100:.2f}% per trade`")
-    with c_ac2:
-        use_vol_filter = st.checkbox("Minimum Volume Filter", value=True)
-        min_volume = st.number_input("Minimum Daily Volume", min_value=1000, value=100000, step=10000, disabled=not use_vol_filter)
-    with c_ac3:
-        position_sizing = st.selectbox("Position Sizing", ["Full Capital (100%)", "Fixed Fraction (50%)"], index=0)
-        pos_size_mult = 1.0 if position_sizing.startswith("Full") else 0.5
+c_r1, c_r2, c_r3, c_r4 = st.columns(4)
+with c_r1:
+    start_date = st.date_input("Start Date", value=default_start, min_value=min_data_date, max_value=max_data_date, key="bt_start_date")
+with c_r2:
+    end_date = st.date_input("End Date", value=max_data_date, min_value=min_data_date, max_value=max_data_date, key="bt_end_date")
+with c_r3:
+    use_vol_filter = st.checkbox("Minimum Volume Filter", value=True, key="bt_chk_vol")
+    min_volume = st.number_input("Min Daily Volume", min_value=1000, value=50000, step=10000, disabled=not use_vol_filter, key="bt_min_vol_num")
+with c_r4:
+    position_sizing = st.selectbox("Position Sizing", ["Full Capital (100%)", "Fixed Fraction (50%)"], index=0, key="bt_pos_size_select")
+    pos_size_mult = 1.0 if position_sizing.startswith("Full") else 0.5
 
 # Filter Data by Date Range
 df_full = df_raw.loc[(df_raw.index.date >= start_date) & (df_raw.index.date <= end_date)].copy()
@@ -172,54 +181,46 @@ if df_full.empty or len(df_full) < 20:
     st.error("Selected date range contains fewer than 20 trading days.")
     st.stop()
 
-# Strategy Dynamic Parameter Inputs
-st.markdown("#### 🛠️ Strategy Parameters")
-s_cols = st.columns(4)
+# Strategy Parameters Collapsible
+with st.expander("🛠️ Strategy Parameter Settings", expanded=False):
+    s_cols = st.columns(4)
+    strat_params = {}
+    if selected_strat == "SMA Crossover":
+        strat_params["fast_window"] = s_cols[0].number_input("Fast Window", min_value=2, max_value=200, value=20, key="p_sma_fast")
+        strat_params["slow_window"] = s_cols[1].number_input("Slow Window", min_value=2, max_value=200, value=50, key="p_sma_slow")
+    elif selected_strat == "EMA Crossover":
+        strat_params["fast_window"] = s_cols[0].number_input("Fast Window", min_value=2, max_value=200, value=12, key="p_ema_fast")
+        strat_params["slow_window"] = s_cols[1].number_input("Slow Window", min_value=2, max_value=200, value=26, key="p_ema_slow")
+    elif selected_strat == "RSI Strategy":
+        strat_params["rsi_window"] = s_cols[0].number_input("RSI Window", min_value=2, max_value=50, value=14, key="p_rsi_win")
+        strat_params["oversold"] = s_cols[1].number_input("Oversold Level", min_value=5, max_value=50, value=30, key="p_rsi_os")
+        strat_params["overbought"] = s_cols[2].number_input("Overbought Level", min_value=50, max_value=95, value=70, key="p_rsi_ob")
+    elif selected_strat == "MACD Strategy":
+        strat_params["fast"] = s_cols[0].number_input("Fast Period", min_value=1, max_value=50, value=12, key="p_macd_fast")
+        strat_params["slow"] = s_cols[1].number_input("Slow Period", min_value=1, max_value=50, value=26, key="p_macd_slow")
+        strat_params["signal"] = s_cols[2].number_input("Signal Period", min_value=1, max_value=20, value=9, key="p_macd_sig")
+    elif selected_strat == "Bollinger Bands Strategy":
+        strat_params["window"] = s_cols[0].number_input("Window", min_value=2, max_value=50, value=20, key="p_bb_win")
+        strat_params["num_std"] = s_cols[1].number_input("Standard Deviations", min_value=1.0, max_value=4.0, value=2.0, step=0.1, key="p_bb_std")
+    elif selected_strat == "Donchian Breakout":
+        strat_params["window"] = s_cols[0].number_input("Channel Window", min_value=2, max_value=200, value=20, key="p_donch_win")
+    elif selected_strat == "Momentum Strategy":
+        strat_params["momentum_window"] = s_cols[0].number_input("Momentum Window", min_value=2, max_value=100, value=20, key="p_mom_win")
+        strat_params["threshold"] = s_cols[1].number_input("Threshold (%)", min_value=0.0, max_value=50.0, value=5.0, step=0.5, key="p_mom_th") / 100.0
+    elif selected_strat == "Mean Reversion Strategy (Z-Score)":
+        strat_params["lookback"] = s_cols[0].number_input("Z-Score Lookback", min_value=2, max_value=100, value=20, key="p_mr_lb")
+        strat_params["entry_z"] = s_cols[1].number_input("Entry Z-Threshold", min_value=0.5, max_value=4.0, value=2.0, step=0.1, key="p_mr_ez")
+        strat_params["exit_z"] = s_cols[2].number_input("Exit Z-Threshold", min_value=0.1, max_value=2.0, value=0.5, step=0.1, key="p_mr_xz")
+    elif selected_strat == "Breakout Strategy":
+        strat_params["lookback"] = s_cols[0].number_input("Lookback Window", min_value=2, max_value=200, value=20, key="p_bo_lb")
+        strat_params["breakout_pct"] = s_cols[1].number_input("Buffer (%)", min_value=0.5, max_value=10.0, value=2.0, step=0.5, key="p_bo_buf") / 100.0
 
-strat_params = {}
-if selected_strat == "SMA Crossover":
-    strat_params["fast_window"] = s_cols[0].number_input("Fast Window", min_value=2, max_value=200, value=20)
-    strat_params["slow_window"] = s_cols[1].number_input("Slow Window", min_value=2, max_value=200, value=50)
-elif selected_strat == "EMA Crossover":
-    strat_params["fast_window"] = s_cols[0].number_input("Fast Window", min_value=2, max_value=200, value=12)
-    strat_params["slow_window"] = s_cols[1].number_input("Slow Window", min_value=2, max_value=200, value=26)
-elif selected_strat == "RSI Strategy":
-    strat_params["rsi_window"] = s_cols[0].number_input("RSI Window", min_value=2, max_value=50, value=14)
-    strat_params["oversold"] = s_cols[1].number_input("Oversold Level", min_value=5, max_value=50, value=30)
-    strat_params["overbought"] = s_cols[2].number_input("Overbought Level", min_value=50, max_value=95, value=70)
-elif selected_strat == "MACD Strategy":
-    strat_params["fast"] = s_cols[0].number_input("Fast Period", min_value=1, max_value=50, value=12)
-    strat_params["slow"] = s_cols[1].number_input("Slow Period", min_value=1, max_value=50, value=26)
-    strat_params["signal"] = s_cols[2].number_input("Signal Period", min_value=1, max_value=20, value=9)
-elif selected_strat == "Bollinger Bands Strategy":
-    strat_params["window"] = s_cols[0].number_input("Window", min_value=2, max_value=50, value=20)
-    strat_params["num_std"] = s_cols[1].number_input("Standard Deviations", min_value=1.0, max_value=4.0, value=2.0, step=0.1)
-elif selected_strat == "Donchian Breakout":
-    strat_params["window"] = s_cols[0].number_input("Channel Window", min_value=2, max_value=200, value=20)
-elif selected_strat == "Momentum Strategy":
-    strat_params["momentum_window"] = s_cols[0].number_input("Momentum Window", min_value=2, max_value=100, value=20)
-    strat_params["threshold"] = s_cols[1].number_input("Threshold (%)", min_value=0.0, max_value=50.0, value=5.0, step=0.5) / 100.0
-elif selected_strat == "Mean Reversion Strategy (Z-Score)":
-    strat_params["lookback"] = s_cols[0].number_input("Z-Score Lookback", min_value=2, max_value=100, value=20)
-    strat_params["entry_z"] = s_cols[1].number_input("Entry Z-Threshold", min_value=0.5, max_value=4.0, value=2.0, step=0.1)
-    strat_params["exit_z"] = s_cols[2].number_input("Exit Z-Threshold", min_value=0.1, max_value=2.0, value=0.5, step=0.1)
-elif selected_strat == "Breakout Strategy":
-    strat_params["lookback"] = s_cols[0].number_input("Lookback Window", min_value=2, max_value=200, value=20)
-    strat_params["breakout_pct"] = s_cols[1].number_input("Buffer (%)", min_value=0.5, max_value=10.0, value=2.0, step=0.5) / 100.0
-
-st.markdown("---")
-
-# ---------------------------------------------------------
-# Action Button: Run Backtest
-# ---------------------------------------------------------
-c_run, _ = st.columns([2, 3])
-with c_run:
-    run_backtest_btn = st.button("▶ Run Backtest", type="primary", use_container_width=True)
+st.divider()
 
 # ---------------------------------------------------------
-# Backtest Engine Computation
+# Signal Generation Engine
 # ---------------------------------------------------------
-def generate_strategy_signals(df, strat_name, params, long_only=True):
+def generate_strategy_signals(df: pd.DataFrame, strat_name: str, params: Dict[str, Any], long_only: bool = True) -> pd.Series:
     close = df["Close"]
     high = df["High"]
     low = df["Low"]
@@ -228,22 +229,19 @@ def generate_strategy_signals(df, strat_name, params, long_only=True):
 
     if strat_name == "Buy & Hold":
         sig[:] = 1
-
-    elif strat_name == "SMA Crossover":
+    elif strat_name.startswith("SMA Crossover"):
         fast_w = params.get("fast_window", 20)
         slow_w = params.get("slow_window", 50)
         sma_fast = close.rolling(fast_w).mean()
         sma_slow = close.rolling(slow_w).mean()
         sig = np.where(sma_fast > sma_slow, 1, (0 if long_only else -1))
-
-    elif strat_name == "EMA Crossover":
+    elif strat_name.startswith("EMA Crossover"):
         fast_w = params.get("fast_window", 12)
         slow_w = params.get("slow_window", 26)
         ema_fast = close.ewm(span=fast_w, adjust=False).mean()
         ema_slow = close.ewm(span=slow_w, adjust=False).mean()
         sig = np.where(ema_fast > ema_slow, 1, (0 if long_only else -1))
-
-    elif strat_name == "RSI Strategy":
+    elif strat_name.startswith("RSI Strategy"):
         rsi_w = params.get("rsi_window", 14)
         oversold = params.get("oversold", 30)
         overbought = params.get("overbought", 70)
@@ -254,7 +252,6 @@ def generate_strategy_signals(df, strat_name, params, long_only=True):
         avg_loss = loss.ewm(span=rsi_w, adjust=False).mean()
         rs = avg_gain / (avg_loss + 1e-10)
         rsi = 100.0 - (100.0 / (1.0 + rs))
-        
         state = 0
         for i in range(1, N):
             r = rsi.iloc[i]
@@ -271,8 +268,7 @@ def generate_strategy_signals(df, strat_name, params, long_only=True):
                 state = 0
             else:
                 sig[i] = sig[i-1]
-
-    elif strat_name == "MACD Strategy":
+    elif strat_name.startswith("MACD Strategy"):
         fast_w = params.get("fast", 12)
         slow_w = params.get("slow", 26)
         sig_w = params.get("signal", 9)
@@ -281,8 +277,7 @@ def generate_strategy_signals(df, strat_name, params, long_only=True):
         macd = ema_fast - ema_slow
         macd_sig = macd.ewm(span=sig_w, adjust=False).mean()
         sig = np.where(macd > macd_sig, 1, (0 if long_only else -1))
-
-    elif strat_name == "Bollinger Bands Strategy":
+    elif strat_name.startswith("Bollinger Bands"):
         w = params.get("window", 20)
         num_std = params.get("num_std", 2.0)
         mb = close.rolling(w).mean()
@@ -305,8 +300,7 @@ def generate_strategy_signals(df, strat_name, params, long_only=True):
                 state = 0
             else:
                 sig[i] = sig[i-1]
-
-    elif strat_name == "Donchian Breakout":
+    elif strat_name.startswith("Donchian Breakout"):
         w = params.get("window", 20)
         dh = high.shift(1).rolling(w).max()
         dl = low.shift(1).rolling(w).min()
@@ -318,8 +312,7 @@ def generate_strategy_signals(df, strat_name, params, long_only=True):
             elif not np.isnan(dl.iloc[i]) and c < dl.iloc[i]:
                 curr = (0 if long_only else -1)
             sig[i] = curr
-
-    elif strat_name == "Momentum Strategy":
+    elif strat_name.startswith("Momentum Strategy"):
         w = params.get("momentum_window", 20)
         thresh = params.get("threshold", 0.05)
         mom_ret = close.pct_change(w)
@@ -332,8 +325,7 @@ def generate_strategy_signals(df, strat_name, params, long_only=True):
                 elif r < -thresh:
                     curr = (0 if long_only else -1)
             sig[i] = curr
-
-    elif strat_name == "Mean Reversion Strategy (Z-Score)":
+    elif strat_name.startswith("Mean Reversion"):
         lookback = params.get("lookback", 20)
         entry_z = params.get("entry_z", 2.0)
         exit_z = params.get("exit_z", 0.5)
@@ -351,8 +343,7 @@ def generate_strategy_signals(df, strat_name, params, long_only=True):
                 elif abs(z) <= exit_z:
                     curr = 0
             sig[i] = curr
-
-    elif strat_name == "Breakout Strategy":
+    elif strat_name.startswith("Breakout"):
         lookback = params.get("lookback", 20)
         b_pct = params.get("breakout_pct", 0.02)
         max_h = high.shift(1).rolling(lookback).max() * (1.0 + b_pct)
@@ -368,545 +359,580 @@ def generate_strategy_signals(df, strat_name, params, long_only=True):
 
     return pd.Series(sig, index=df.index).fillna(0)
 
-# Compute Signals
-raw_signals = generate_strategy_signals(df_full, selected_strat, strat_params, long_only=(position_mode=="Long Only"))
 
-# Liquidity Filter
-if use_vol_filter and "Volume" in df_full.columns:
-    vol_mask = df_full["Volume"] < min_volume
-    raw_signals[vol_mask] = 0
+# Core Backtest Simulation Runner
+def run_full_backtest(df: pd.DataFrame, strat_name: str, params: Dict[str, Any],
+                      long_only: bool = True, comm_rate: float = 0.002, init_cap: float = 100000.0,
+                      pos_mult: float = 1.0, min_vol: int = 0) -> Dict[str, Any]:
+    raw_sig = generate_strategy_signals(df, strat_name, params, long_only=long_only)
+    if min_vol > 0 and "Volume" in df.columns:
+        raw_sig[df["Volume"] < min_vol] = 0
+    executed_p = raw_sig.shift(1).fillna(0) * pos_mult
+    
+    close_p = df["Close"]
+    open_p = df["Open"]
+    dates = df.index
+    N = len(df)
+    
+    daily_asset_rets = close_p.pct_change().fillna(0.0)
+    pos_changes = executed_p.diff().abs().fillna(0.0)
+    cost_deductions = pos_changes * comm_rate
+    daily_strat_rets = executed_p * daily_asset_rets - cost_deductions
+    
+    strat_equity = init_cap * (1.0 + daily_strat_rets).cumprod()
+    buy_hold_equity = init_cap * (close_p / close_p.iloc[0])
+    
+    peak_eq = np.maximum.accumulate(strat_equity)
+    drawdown_series = ((strat_equity - peak_eq) / peak_eq) * 100.0
+    max_dd_pct = float(drawdown_series.min())
+    
+    final_cap = float(strat_equity.iloc[-1])
+    total_strat_ret = float(((final_cap - init_cap) / init_cap) * 100.0)
+    total_bh_ret = float(((buy_hold_equity.iloc[-1] - init_cap) / init_cap) * 100.0)
+    net_alpha = total_strat_ret - total_bh_ret
+    
+    n_years = max(1.0 / 252.0, N / 252.0)
+    cagr_strat = float((((final_cap / init_cap) ** (1.0 / n_years)) - 1.0) * 100.0)
+    cagr_bh = float((((buy_hold_equity.iloc[-1] / init_cap) ** (1.0 / n_years)) - 1.0) * 100.0)
+    
+    rf_daily = 0.05 / 252.0
+    excess_rets = daily_strat_rets - rf_daily
+    strat_vol = float(daily_strat_rets.std())
+    sharpe = float((excess_rets.mean() * 252.0) / (strat_vol * np.sqrt(252.0) + 1e-10)) if strat_vol > 0 else 0.0
+    
+    downside_rets = daily_strat_rets[daily_strat_rets < 0]
+    downside_vol = float(downside_rets.std()) if len(downside_rets) > 0 else 1e-10
+    sortino = float((excess_rets.mean() * 252.0) / (downside_vol * np.sqrt(252.0) + 1e-10))
+    calmar = float(cagr_strat / abs(max_dd_pct + 1e-8)) if max_dd_pct < 0 else 0.0
 
-# Position Execution (Close(t) -> Open(t+1))
-executed_pos = raw_signals.shift(1).fillna(0) * pos_size_mult
+    # Trade extraction
+    trade_rows = []
+    in_trade = False
+    t_entry_date = None
+    t_entry_price = 0.0
+    t_type = None
+    
+    for i in range(1, N):
+        p_prev = executed_p.iloc[i-1]
+        p_curr = executed_p.iloc[i]
+        c_date = dates[i]
+        c_open = open_p.iloc[i]
+        
+        if p_curr != p_prev:
+            if in_trade:
+                t_exit_date = c_date
+                t_exit_price = c_open
+                h_days = (t_exit_date - t_entry_date).days if hasattr(t_exit_date - t_entry_date, 'days') else i
+                t_ret = ((t_exit_price - t_entry_price) / t_entry_price - comm_rate) if t_type == "Long" else ((t_entry_price - t_exit_price) / t_entry_price - comm_rate)
+                t_pnl = init_cap * t_ret
+                trade_rows.append({
+                    "Trade #": f"#{len(trade_rows)+1}",
+                    "Direction": t_type,
+                    "Entry Date": t_entry_date.strftime('%Y-%m-%d') if hasattr(t_entry_date, 'strftime') else str(t_entry_date),
+                    "Entry Price": t_entry_price,
+                    "Exit Date": t_exit_date.strftime('%Y-%m-%d') if hasattr(t_exit_date, 'strftime') else str(t_exit_date),
+                    "Exit Price": t_exit_price,
+                    "Duration (Days)": h_days,
+                    "Return (%)": t_ret * 100.0,
+                    "PnL": t_pnl,
+                    "Result": "Win 🟢" if t_ret > 0 else "Loss 🔴"
+                })
+                in_trade = False
+            if p_curr != 0:
+                in_trade = True
+                t_entry_date = c_date
+                t_entry_price = c_open
+                t_type = "Long" if p_curr > 0 else "Short"
+                
+    trades_df = pd.DataFrame(trade_rows)
+    win_rate = float((len(trades_df[trades_df["Return (%)"] > 0]) / len(trades_df) * 100.0)) if len(trades_df) > 0 else 0.0
+    win_rets = trades_df[trades_df["Return (%)"] > 0]["Return (%)"].values if len(trades_df) > 0 else []
+    loss_rets = trades_df[trades_df["Return (%)"] < 0]["Return (%)"].values if len(trades_df) > 0 else []
+    profit_factor = (sum(win_rets) / abs(sum(loss_rets))) if len(loss_rets) > 0 and sum(loss_rets) != 0 else float(sum(win_rets))
 
-# Returns & Costs
-close_p = df_full["Close"]
-open_p = df_full["Open"]
-dates = df_full.index
-N = len(df_full)
+    return {
+        "dates": dates,
+        "close": close_p,
+        "open": open_p,
+        "executed_pos": executed_p,
+        "pos_changes": pos_changes,
+        "daily_strat_rets": daily_strat_rets,
+        "daily_asset_rets": daily_asset_rets,
+        "strat_equity": strat_equity,
+        "buy_hold_equity": buy_hold_equity,
+        "drawdown_series": drawdown_series,
+        "max_dd_pct": max_dd_pct,
+        "final_cap": final_cap,
+        "total_strat_ret": total_strat_ret,
+        "total_bh_ret": total_bh_ret,
+        "net_alpha": net_alpha,
+        "cagr_strat": cagr_strat,
+        "cagr_bh": cagr_bh,
+        "sharpe": sharpe,
+        "sortino": sortino,
+        "calmar": calmar,
+        "trades_df": trades_df,
+        "win_rate": win_rate,
+        "profit_factor": profit_factor
+    }
 
-daily_asset_rets = close_p.pct_change().fillna(0)
-pos_changes = executed_pos.diff().abs().fillna(0)
-cost_deductions = pos_changes * total_cost_per_trade
 
-daily_strat_rets = executed_pos * daily_asset_rets - cost_deductions
-strat_equity = initial_capital * (1.0 + daily_strat_rets).cumprod()
-buy_hold_equity = initial_capital * (close_p / close_p.iloc[0])
+# Execute Primary Backtest
+vol_filter_val = min_volume if use_vol_filter else 0
+res = run_full_backtest(
+    df_full, selected_strat, strat_params,
+    long_only=(position_mode == "Long Only"),
+    comm_rate=total_cost_per_trade,
+    init_cap=initial_capital,
+    pos_mult=pos_size_mult,
+    min_vol=vol_filter_val
+)
 
-# Market Benchmark Equity
+# Market Benchmark Series Alignment
 if benchmark_choice.startswith("NIFTY") or benchmark_choice.startswith("S&P"):
-    bench_symbol = "^NSEI" if region == "India" else "^GSPC"
-    df_bench = get_processed_data(bench_symbol, period_str="max", interval_str="1d")
+    df_bench = get_processed_data(bench_default, period_str="max", interval_str="1d")
     if not df_bench.empty and "Close" in df_bench.columns:
-        common_b_dates = dates.intersection(df_bench.index)
+        common_b_dates = res["dates"].intersection(df_bench.index)
         bench_close = df_bench.loc[common_b_dates, "Close"]
         market_bench_equity = initial_capital * (bench_close / bench_close.iloc[0])
-        market_bench_equity = market_bench_equity.reindex(dates).ffill().bfill()
+        market_bench_equity = market_bench_equity.reindex(res["dates"]).ffill().bfill()
     else:
-        market_bench_equity = buy_hold_equity
+        market_bench_equity = res["buy_hold_equity"]
 else:
-    market_bench_equity = buy_hold_equity
+    market_bench_equity = res["buy_hold_equity"]
 
-# Drawdown Curve
-peak_eq = np.maximum.accumulate(strat_equity)
-drawdown_series = ((strat_equity - peak_eq) / peak_eq) * 100.0
-max_dd_pct = float(drawdown_series.min())
+mkt_total_ret = float(((market_bench_equity.iloc[-1] - initial_capital) / initial_capital) * 100.0)
 
-# Calculate Max Drawdown Duration
-dd_periods = drawdown_series < 0
-max_dd_duration = 0
-curr_dd_dur = 0
-for is_dd in dd_periods:
-    if is_dd:
-        curr_dd_dur += 1
-        max_dd_duration = max(max_dd_duration, curr_dd_dur)
-    else:
-        curr_dd_dur = 0
-
-# Core Metrics
-final_capital = float(strat_equity.iloc[-1])
-total_strat_ret_pct = float(((final_capital - initial_capital) / initial_capital) * 100.0)
-total_bh_ret_pct = float(((buy_hold_equity.iloc[-1] - initial_capital) / initial_capital) * 100.0)
-total_market_ret_pct = float(((market_bench_equity.iloc[-1] - initial_capital) / initial_capital) * 100.0)
-
-n_years = max(1.0 / 252.0, N / 252.0)
-cagr_strat_pct = float((((final_capital / initial_capital) ** (1.0 / n_years)) - 1.0) * 100.0)
-cagr_bh_pct = float((((buy_hold_equity.iloc[-1] / initial_capital) ** (1.0 / n_years)) - 1.0) * 100.0)
-cagr_market_pct = float((((market_bench_equity.iloc[-1] / initial_capital) ** (1.0 / n_years)) - 1.0) * 100.0)
-
-rf_daily = 0.05 / 252.0
-excess_rets = daily_strat_rets - rf_daily
-std_rets = float(daily_strat_rets.std())
-sharpe_ratio = float((excess_rets.mean() * 252.0) / (std_rets * np.sqrt(252.0) + 1e-10)) if std_rets > 0 else 0.0
-
-downside_rets = daily_strat_rets[daily_strat_rets < 0]
-downside_std = float(downside_rets.std()) if len(downside_rets) > 0 else 1e-10
-sortino_ratio = float((excess_rets.mean() * 252.0) / (downside_std * np.sqrt(252.0) + 1e-10))
-
-# Trade Log Extraction
-trade_rows = []
-in_trade = False
-t_entry_date = None
-t_entry_price = 0.0
-t_type = None
-
-for i in range(1, N):
-    p_prev = executed_pos.iloc[i-1]
-    p_curr = executed_pos.iloc[i]
-    c_date = dates[i]
-    c_open = open_p.iloc[i]
-    
-    if p_curr != p_prev:
-        if in_trade:
-            t_exit_date = c_date
-            t_exit_price = c_open
-            h_days = (t_exit_date - t_entry_date).days if hasattr(t_exit_date - t_entry_date, 'days') else i
-            t_ret = ((t_exit_price - t_entry_price) / t_entry_price - total_cost_per_trade) if t_type == "Long" else ((t_entry_price - t_exit_price) / t_entry_price - total_cost_per_trade)
-            t_pnl = initial_capital * t_ret
-            trade_rows.append({
-                "Trade #": f"#{len(trade_rows)+1}",
-                "Direction": t_type,
-                "Entry Date": t_entry_date.strftime('%Y-%m-%d') if hasattr(t_entry_date, 'strftime') else str(t_entry_date),
-                "Entry Price": f"{currency_sym}{t_entry_price:,.2f}",
-                "Exit Date": t_exit_date.strftime('%Y-%m-%d') if hasattr(t_exit_date, 'strftime') else str(t_exit_date),
-                "Exit Price": f"{currency_sym}{t_exit_price:,.2f}",
-                "Duration": h_days,
-                "Return": f"{t_ret * 100.0:+.2f}%",
-                "PnL": f"{currency_sym}{t_pnl:+,.2f}",
-                "Result": "Win 🟢" if t_ret > 0 else "Loss 🔴"
-            })
-            in_trade = False
-            
-        if p_curr != 0:
-            in_trade = True
-            t_entry_date = c_date
-            t_entry_price = c_open
-            t_type = "Long" if p_curr > 0 else "Short"
-
-trades_df = pd.DataFrame(trade_rows)
-total_trades = len(trades_df)
-
-if total_trades > 0 and "Return" in trades_df.columns:
-    numeric_rets = [float(r.replace('%', '').replace('+', '')) for r in trades_df["Return"]]
-    win_trades = [r for r in numeric_rets if r > 0]
-    loss_trades = [r for r in numeric_rets if r < 0]
-    win_rate_pct = (len(win_trades) / total_trades) * 100.0
-    profit_factor = (sum(win_trades) / abs(sum(loss_trades))) if sum(loss_trades) != 0 else float(sum(win_trades))
-    avg_trade_ret = float(np.mean(numeric_rets))
-    avg_duration = float(np.mean(trades_df["Duration"]))
-    avg_winner = float(np.mean(win_trades)) if win_trades else 0.0
-    avg_loser = float(np.mean(loss_trades)) if loss_trades else 0.0
-    max_winner = float(np.max(win_trades)) if win_trades else 0.0
-    max_loser = float(np.min(loss_trades)) if loss_trades else 0.0
-else:
-    win_rate_pct = 0.0
-    profit_factor = 0.0
-    avg_trade_ret = 0.0
-    avg_duration = 0.0
-    avg_winner = 0.0
-    avg_loser = 0.0
-    max_winner = 0.0
-    max_loser = 0.0
-
-# Status Banner
-st.success(f"✓ **Backtest Completed:** `{company} ({ticker})` | Strategy: **{selected_strat}** | Period: `{start_date}` → `{end_date}` | Final Capital: **{currency_sym}{final_capital:,.2f}** (`{total_trades}` trades executed)")
-
-# ---------------------------------------------------------
-# 1. Performance Summary Cards (8 KPI Cards)
-# ---------------------------------------------------------
-st.subheader("📊 Performance Summary")
-
-k1, k2, k3, k4 = st.columns(4)
+# Summary KPI Cards
+k1, k2, k3, k4, k5 = st.columns(5)
 with k1:
-    st.metric("Total Return", f"{total_strat_ret_pct:+.2f}%", delta=f"{total_strat_ret_pct - total_bh_ret_pct:+.2f}% vs B&H")
+    st.metric("Strategy Return", f"{res['total_strat_ret']:+.2f}%", delta=f"{res['net_alpha']:+.2f}% vs B&H")
 with k2:
-    st.metric("Annualized Return (CAGR)", f"{cagr_strat_pct:+.2f}%")
+    st.metric("Annualized Return (CAGR)", f"{res['cagr_strat']:+.2f}%")
 with k3:
-    st.metric("Sharpe Ratio", f"{sharpe_ratio:.2f}")
+    st.metric("Sharpe Ratio", f"{res['sharpe']:.2f}", help="Excess return over 5% risk-free rate.")
 with k4:
-    st.metric("Sortino Ratio", f"{sortino_ratio:.2f}")
-
-k5, k6, k7, k8 = st.columns(4)
+    st.metric("Max Drawdown", f"{res['max_dd_pct']:.2f}%")
 with k5:
-    st.metric("Max Drawdown", f"{max_dd_pct:.2f}%")
-with k6:
-    st.metric("Win Rate", f"{win_rate_pct:.1f}%")
-with k7:
-    st.metric("Profit Factor", f"{profit_factor:.2f}")
-with k8:
-    st.metric("Total Trades", f"{total_trades}")
+    st.metric("Win Rate", f"{res['win_rate']:.1f}%", help=f"Total Trades: {len(res['trades_df'])}")
 
-st.markdown("---")
+st.divider()
 
 # ---------------------------------------------------------
-# 2. Performance Comparison Table
+# 8-Tab Modular Quant Backtest Suite
 # ---------------------------------------------------------
-st.subheader("⚖️ Performance Comparison")
-
-bh_sharpe = float(((daily_asset_rets - rf_daily).mean() * 252.0) / (daily_asset_rets.std() * np.sqrt(252.0) + 1e-10))
-mkt_rets = market_bench_equity.pct_change().fillna(0)
-mkt_sharpe = float(((mkt_rets - rf_daily).mean() * 252.0) / (mkt_rets.std() * np.sqrt(252.0) + 1e-10))
-
-bh_dd = float((((buy_hold_equity - np.maximum.accumulate(buy_hold_equity)) / np.maximum.accumulate(buy_hold_equity)) * 100.0).min())
-mkt_dd = float((((market_bench_equity - np.maximum.accumulate(market_bench_equity)) / np.maximum.accumulate(market_bench_equity)) * 100.0).min())
-
-comp_df = pd.DataFrame([
-    {
-        "Metric": "Total Return (%)",
-        "Strategy": f"{total_strat_ret_pct:+.2f}%",
-        "Buy & Hold": f"{total_bh_ret_pct:+.2f}%",
-        "Market Benchmark": f"{total_market_ret_pct:+.2f}%"
-    },
-    {
-        "Metric": "Annualized Return (CAGR)",
-        "Strategy": f"{cagr_strat_pct:+.2f}%",
-        "Buy & Hold": f"{cagr_bh_pct:+.2f}%",
-        "Market Benchmark": f"{cagr_market_pct:+.2f}%"
-    },
-    {
-        "Metric": "Sharpe Ratio",
-        "Strategy": f"{sharpe_ratio:.2f}",
-        "Buy & Hold": f"{bh_sharpe:.2f}",
-        "Market Benchmark": f"{mkt_sharpe:.2f}"
-    },
-    {
-        "Metric": "Max Drawdown (%)",
-        "Strategy": f"{max_dd_pct:.2f}%",
-        "Buy & Hold": f"{bh_dd:.2f}%",
-        "Market Benchmark": f"{mkt_dd:.2f}%"
-    },
-    {
-        "Metric": "Outperformance vs Bench",
-        "Strategy": f"{total_strat_ret_pct - total_market_ret_pct:+.2f}%",
-        "Buy & Hold": f"{total_bh_ret_pct - total_market_ret_pct:+.2f}%",
-        "Market Benchmark": "—"
-    }
+tab_growth, tab_tourn, tab_risk_mgmt, tab_mc_resample, tab_attribution, tab_split, tab_sensitivity, tab_trades = st.tabs([
+    "📈 Equity Growth & Benchmark",
+    "🏆 10-Strategy Tournament",
+    "🛡️ Risk Overlays & Trailing Stops",
+    "🎲 Monte Carlo Trade Resampling",
+    "🔬 Alpha, Beta & Capture Ratios",
+    "🧪 Chronological 3-Way Split & DSR",
+    "🔥 Parameter Sensitivity Heatmap",
+    "📋 Trade Execution Log"
 ])
-st.dataframe(comp_df, use_container_width=True, hide_index=True)
 
-st.markdown("---")
+# =========================================================
+# TAB 1: Equity Growth & Benchmark
+# =========================================================
+with tab_growth:
+    st.subheader("📈 Portfolio Equity Growth Curve")
+    c_ctl1, c_ctl2 = st.columns([3, 1])
+    with c_ctl1:
+        show_strat = st.checkbox("Show Strategy", value=True, key="bt_chk_show_strat")
+        show_bh = st.checkbox("Show Buy & Hold", value=True, key="bt_chk_show_bh")
+        show_mkt = st.checkbox(f"Show {benchmark_choice}", value=(benchmark_choice != "None"), key="bt_chk_show_mkt")
+    with c_ctl2:
+        scale_mode = st.radio("Scale", ["Linear", "Log"], index=0, horizontal=True, key="bt_scale_radio")
 
-# ---------------------------------------------------------
-# 3. Hero Visualization: Portfolio Growth (Equity Curve)
-# ---------------------------------------------------------
-st.subheader("📈 Portfolio Growth (Equity Curve)")
+    fig_eq = go.Figure()
+    if show_strat:
+        fig_eq.add_trace(go.Scatter(x=res["dates"], y=res["strat_equity"], mode="lines", name=f"{selected_strat}", line=dict(color="#00E676", width=2.2)))
+    if show_bh:
+        fig_eq.add_trace(go.Scatter(x=res["dates"], y=res["buy_hold_equity"], mode="lines", name=f"Buy & Hold {company}", line=dict(color="#38BDF8", width=1.5, dash="dash")))
+    if show_mkt and benchmark_choice != "None":
+        fig_eq.add_trace(go.Scatter(x=res["dates"], y=market_bench_equity, mode="lines", name=f"{benchmark_choice}", line=dict(color="#F59E0B", width=1.5, dash="dot")))
 
-c_eq_ctl1, c_eq_ctl2 = st.columns([3, 1])
-with c_eq_ctl1:
-    c_show_strat = st.checkbox("Show Strategy", value=True)
-    c_show_bh = st.checkbox("Show Buy & Hold", value=True)
-    c_show_mkt = st.checkbox("Show Market Benchmark", value=True)
-with c_eq_ctl2:
-    scale_type = st.radio("Y-Axis Scale", ["Linear", "Log"], index=0, horizontal=True)
-
-fig_equity = go.Figure()
-
-if c_show_strat:
-    fig_equity.add_trace(go.Scatter(
-        x=dates, y=strat_equity, mode="lines", name=f"Strategy ({selected_strat})",
-        line=dict(color="#00E676", width=2.2)
-    ))
-
-if c_show_bh:
-    fig_equity.add_trace(go.Scatter(
-        x=dates, y=buy_hold_equity, mode="lines", name=f"Buy & Hold ({ticker})",
-        line=dict(color="#38BDF8", width=1.5, dash="dash")
-    ))
-
-if c_show_mkt and benchmark_choice != "None":
-    fig_equity.add_trace(go.Scatter(
-        x=dates, y=market_bench_equity, mode="lines", name=f"Benchmark ({benchmark_choice})",
-        line=dict(color="#F59E0B", width=1.5, dash="dot")
-    ))
-
-fig_equity.update_layout(
-    template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.6)",
-    height=480, margin=dict(l=20, r=20, t=30, b=20),
-    legend=dict(orientation="h", y=1.12, x=1, xanchor="right"),
-    yaxis=dict(title=f"Portfolio Value ({currency_sym})", type="log" if scale_type=="Log" else "linear", gridcolor="rgba(255,255,255,0.05)"),
-    xaxis=dict(title="Date", type="date", gridcolor="rgba(255,255,255,0.05)")
-)
-st.plotly_chart(fig_equity, use_container_width=True)
-
-# ---------------------------------------------------------
-# 4. Drawdown & Position Exposure Grid
-# ---------------------------------------------------------
-c_dd_chart, c_exp_chart = st.columns(2)
-
-with c_dd_chart:
-    st.subheader("📉 Drawdown Profile (%)")
-    fig_dd_chart = go.Figure()
-    fig_dd_chart.add_trace(go.Scatter(
-        x=dates, y=drawdown_series, mode="lines", fill="tozeroy",
-        fillcolor="rgba(244, 63, 94, 0.25)", line=dict(color="#FF5252", width=1.5),
-        name="Drawdown %"
-    ))
-    fig_dd_chart.update_layout(
+    fig_eq.update_layout(
         template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.6)",
-        height=320, margin=dict(l=20, r=20, t=30, b=20),
-        yaxis=dict(title="Drawdown (%)", gridcolor="rgba(255,255,255,0.05)"),
+        height=450, margin=dict(l=20, r=20, t=30, b=20),
+        legend=dict(orientation="h", y=1.12, x=1, xanchor="right"),
+        yaxis=dict(title=f"Equity ({currency_sym})", type="log" if scale_mode=="Log" else "linear", gridcolor="rgba(255,255,255,0.05)"),
         xaxis=dict(title="Date", type="date", gridcolor="rgba(255,255,255,0.05)")
     )
-    st.plotly_chart(fig_dd_chart, use_container_width=True)
-    st.caption(f"📉 **Max Drawdown:** `{max_dd_pct:.2f}%` | **Max DD Duration:** `{max_dd_duration}` trading days")
+    st.plotly_chart(fig_eq, width="stretch")
 
-with c_exp_chart:
-    st.subheader("📊 Position Exposure Over Time")
-    fig_pos = go.Figure()
-    fig_pos.add_trace(go.Scatter(
-        x=dates, y=executed_pos, mode="lines",
-        line=dict(color="#A855F7", width=1.5), name="Position (+1 Long / 0 Cash / -1 Short)"
-    ))
-    fig_pos.update_layout(
-        template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.6)",
-        height=320, margin=dict(l=20, r=20, t=30, b=20),
-        yaxis=dict(title="Position Exposure", range=[-1.2, 1.2], dtick=1, gridcolor="rgba(255,255,255,0.05)"),
-        xaxis=dict(title="Date", type="date", gridcolor="rgba(255,255,255,0.05)")
-    )
-    st.plotly_chart(fig_pos, use_container_width=True)
+    c_g_dd, c_g_pos = st.columns(2)
+    with c_g_dd:
+        st.subheader("📉 Drawdown Profile (%)")
+        fig_dd = go.Figure()
+        fig_dd.add_trace(go.Scatter(x=res["dates"], y=res["drawdown_series"], mode="lines", fill="tozeroy", fillcolor="rgba(244, 63, 94, 0.25)", line=dict(color="#FF5252", width=1.5)))
+        fig_dd.update_layout(template="plotly_dark", height=300, yaxis=dict(title="Drawdown %"))
+        st.plotly_chart(fig_dd, width="stretch")
+    with c_g_pos:
+        st.subheader("📊 Position Exposure (+1 Long / 0 Cash / -1 Short)")
+        fig_p = go.Figure()
+        fig_p.add_trace(go.Scatter(x=res["dates"], y=res["executed_pos"], mode="lines", line=dict(color="#A855F7", width=1.5)))
+        fig_p.update_layout(template="plotly_dark", height=300, yaxis=dict(title="Position Exposure", range=[-1.2, 1.2]))
+        st.plotly_chart(fig_p, width="stretch")
 
-st.markdown("---")
+# =========================================================
+# TAB 2: 10-Strategy Tournament Leaderboard
+# =========================================================
+with tab_tourn:
+    st.subheader("🏆 Multi-Strategy Tournament Leaderboard")
+    st.caption(f"Cross-sectional benchmark comparing all 10 strategies over the selected date range (`{start_date}` to `{end_date}`).")
 
-# ---------------------------------------------------------
-# 5. Returns Analysis (Annual & Monthly Heatmap)
-# ---------------------------------------------------------
-st.subheader("📅 Returns Analysis")
+    TOURNAMENT_STRATEGIES = [
+        {"name": "SMA Crossover", "params": {"fast_window": 20, "slow_window": 50}},
+        {"name": "EMA Crossover", "params": {"fast_window": 12, "slow_window": 26}},
+        {"name": "RSI Strategy", "params": {"rsi_window": 14, "oversold": 30, "overbought": 70}},
+        {"name": "MACD Strategy", "params": {"fast": 12, "slow": 26, "signal": 9}},
+        {"name": "Bollinger Bands Strategy", "params": {"window": 20, "num_std": 2.0}},
+        {"name": "Donchian Breakout", "params": {"window": 20}},
+        {"name": "Momentum Strategy", "params": {"momentum_window": 20, "threshold": 0.05}},
+        {"name": "Mean Reversion Strategy (Z-Score)", "params": {"lookback": 20, "entry_z": 2.0, "exit_z": 0.5}},
+        {"name": "Breakout Strategy", "params": {"lookback": 20, "breakout_pct": 0.02}},
+        {"name": "Buy & Hold", "params": {}}
+    ]
 
-df_returns_calc = pd.DataFrame({"Strat": daily_strat_rets, "Bench": daily_asset_rets}, index=dates)
-
-annual_strat = df_returns_calc["Strat"].resample("YE").apply(lambda r: (1.0 + r).prod() - 1.0) * 100.0
-annual_bench = df_returns_calc["Bench"].resample("YE").apply(lambda r: (1.0 + r).prod() - 1.0) * 100.0
-
-annual_df = pd.DataFrame({
-    "Year": annual_strat.index.year,
-    "Strategy Return": [f"{v:+.2f}%" for v in annual_strat.values],
-    "Benchmark Return": [f"{v:+.2f}%" for v in annual_bench.values],
-    "Excess Return": [f"{s - b:+.2f}%" for s, b in zip(annual_strat.values, annual_bench.values)]
-})
-
-col_ann, col_m_hm = st.columns([1, 1])
-
-with col_ann:
-    st.markdown("#### Annual Returns")
-    st.dataframe(annual_df, use_container_width=True, hide_index=True)
-
-with col_m_hm:
-    st.markdown("#### Monthly Returns Breakdown")
-    monthly_strat = df_returns_calc["Strat"].resample("ME").apply(lambda r: (1.0 + r).prod() - 1.0) * 100.0
-    if not monthly_strat.empty:
-        m_df = pd.DataFrame({
-            "Year": monthly_strat.index.year,
-            "Month": monthly_strat.index.strftime('%b'),
-            "Return (%)": monthly_strat.values
+    tourn_list = []
+    for item in TOURNAMENT_STRATEGIES:
+        t_res = run_full_backtest(
+            df_full, item["name"], item["params"],
+            long_only=(position_mode == "Long Only"),
+            comm_rate=total_cost_per_trade,
+            init_cap=initial_capital,
+            pos_mult=pos_size_mult,
+            min_vol=vol_filter_val
+        )
+        tourn_list.append({
+            "Strategy": item["name"],
+            "Net Return (%)": t_res["total_strat_ret"],
+            "CAGR (%)": t_res["cagr_strat"],
+            "Net Alpha vs B&H (%)": t_res["net_alpha"],
+            "Sharpe Ratio": t_res["sharpe"],
+            "Sortino Ratio": t_res["sortino"],
+            "Calmar Ratio": t_res["calmar"],
+            "Max Drawdown (%)": t_res["max_dd_pct"],
+            "Win Rate (%)": t_res["win_rate"],
+            "Trades": len(t_res["trades_df"])
         })
-        fig_m = px.bar(
-            m_df, x="Month", y="Return (%)", color="Return (%)",
-            color_continuous_scale=["#FF5252", "#F59E0B", "#00E676"], text_auto=".1f"
-        )
-        fig_m.update_layout(
-            template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.6)",
-            height=280, margin=dict(l=20, r=20, t=30, b=20)
-        )
-        st.plotly_chart(fig_m, use_container_width=True)
 
-st.markdown("---")
+    df_tourn = pd.DataFrame(tourn_list).sort_values(by="Sharpe Ratio", ascending=False).reset_index(drop=True)
+    st.dataframe(df_tourn.style.format({
+        "Net Return (%)": "{:+.2f}%",
+        "CAGR (%)": "{:+.2f}%",
+        "Net Alpha vs B&H (%)": "{:+.2f}%",
+        "Sharpe Ratio": "{:.2f}",
+        "Sortino Ratio": "{:.2f}",
+        "Calmar Ratio": "{:.2f}",
+        "Max Drawdown (%)": "{:.2f}%",
+        "Win Rate (%)": "{:.1f}%"
+    }), width="stretch")
 
-# ---------------------------------------------------------
-# 6. Trade Analysis & Order Log
-# ---------------------------------------------------------
-st.subheader("💹 Trade Analysis & Execution Log")
-
-ta1, ta2, ta3, ta4 = st.columns(4)
-with ta1:
-    st.metric("Avg Trade Return", f"{avg_trade_ret:+.2f}%")
-with ta2:
-    st.metric("Avg Trade Duration", f"{avg_duration:.1f} Days")
-with ta3:
-    st.metric("Avg Winner / Loser", f"{avg_winner:+.2f}% / {avg_loser:+.2f}%")
-with ta4:
-    st.metric("Largest Win / Loss", f"{max_winner:+.2f}% / {max_loser:+.2f}%")
-
-if total_trades > 0:
-    st.dataframe(trades_df, use_container_width=True, hide_index=True)
-    
-    csv_data = trades_df.to_csv(index=False).encode('utf-8')
-    st.download_button(
-        label="📥 Download Trade Log CSV",
-        data=csv_data,
-        file_name=f"backtest_trades_{ticker}_{selected_strat}.csv",
-        mime="text/csv"
+    fig_bar = px.bar(
+        df_tourn, x="Net Alpha vs B&H (%)", y="Strategy", orientation="h",
+        color="Net Alpha vs B&H (%)", color_continuous_scale="RdYlGn",
+        title="Excess Strategy Alpha Spread vs Buy & Hold Benchmark (%)"
     )
-else:
-    st.info("No trades executed during this timeframe.")
-
-st.markdown("---")
-
-# ---------------------------------------------------------
-# 7. Advanced Analysis Tabs
-# ---------------------------------------------------------
-st.subheader("🔬 Advanced Analysis & Validation")
-
-tab_val, tab_opt, tab_sens, tab_regime = st.tabs(["🧪 Validation", "⚡ Optimization", "🎯 Sensitivity", "📊 Regimes"])
+    fig_bar.add_vline(x=0.0, line_dash="dash", line_color="#FFFFFF")
+    fig_bar.update_layout(template="plotly_dark", height=380)
+    st.plotly_chart(fig_bar, width="stretch")
 
 # =========================================================
-# TAB 1: Validation (3-Way Split & Walk-Forward)
+# TAB 3: Risk Overlays & Trailing Stops
 # =========================================================
-with tab_val:
-    st.subheader("🧪 Chronological 3-Way Split Validation")
-    st.caption("Data is chronologically partitioned into Train (60%), Validation (20%), and Test (20%) to prevent data leakage.")
+with tab_risk_mgmt:
+    st.subheader("🛡️ Dynamic Risk-Management Overlays")
+    st.caption("Apply stop-loss, trailing stops, and take-profit targets to evaluate drawdown mitigation.")
+
+    rc1, rc2, rc3 = st.columns(3)
+    with rc1:
+        use_sl = st.checkbox("Enable Stop-Loss", value=True, key="bt_chk_sl")
+        sl_pct = st.slider("Stop-Loss Threshold (%)", -15.0, -1.0, -4.0, step=0.5, disabled=not use_sl, key="bt_sl_slider") / 100.0
+    with rc2:
+        use_ts = st.checkbox("Enable Trailing Stop", value=False, key="bt_chk_ts")
+        ts_pct = st.slider("Trailing Distance (%)", 2.0, 15.0, 5.0, step=0.5, disabled=not use_ts, key="bt_ts_slider") / 100.0
+    with rc3:
+        use_tp = st.checkbox("Enable Take-Profit Target", value=False, key="bt_chk_tp")
+        tp_pct = st.slider("Take-Profit Target (%)", 2.0, 25.0, 8.0, step=0.5, disabled=not use_tp, key="bt_tp_slider") / 100.0
+
+    # Simulate Risk-Managed Overlay
+    raw_sig_base = generate_strategy_signals(df_full, selected_strat, strat_params, long_only=(position_mode=="Long Only"))
+    close_vals = df_full["Close"].values
+    N_bars = len(df_full)
+    risk_pos = np.zeros(N_bars)
     
-    n_train = int(0.60 * N)
-    n_val = int(0.20 * N)
-    
-    df_train = df_full.iloc[:n_train]
-    df_validation = df_full.iloc[n_train:n_train+n_val]
-    df_test = df_full.iloc[n_train+n_val:]
-    
-    sig_train = generate_strategy_signals(df_train, selected_strat, strat_params, long_only=(position_mode=="Long Only")).shift(1).fillna(0)
-    sig_val = generate_strategy_signals(df_validation, selected_strat, strat_params, long_only=(position_mode=="Long Only")).shift(1).fillna(0)
-    sig_test = generate_strategy_signals(df_test, selected_strat, strat_params, long_only=(position_mode=="Long Only")).shift(1).fillna(0)
-    
-    ret_train = (sig_train * df_train["Close"].pct_change().fillna(0) - sig_train.diff().abs().fillna(0)*total_cost_per_trade)
-    ret_val = (sig_val * df_validation["Close"].pct_change().fillna(0) - sig_val.diff().abs().fillna(0)*total_cost_per_trade)
-    ret_test = (sig_test * df_test["Close"].pct_change().fillna(0) - sig_test.diff().abs().fillna(0)*total_cost_per_trade)
-    
-    eq_tr = (1.0 + ret_train).cumprod()
-    eq_val = (1.0 + ret_val).cumprod()
-    eq_te = (1.0 + ret_test).cumprod()
-    
-    cagr_tr = (((eq_tr.iloc[-1]) ** (252.0 / max(1, len(df_train)))) - 1.0) * 100.0
-    cagr_val = (((eq_val.iloc[-1]) ** (252.0 / max(1, len(df_validation)))) - 1.0) * 100.0
-    cagr_te = (((eq_te.iloc[-1]) ** (252.0 / max(1, len(df_test)))) - 1.0) * 100.0
-    
-    sh_tr = (ret_train.mean() * 252.0) / (ret_train.std() * np.sqrt(252.0) + 1e-10)
-    sh_val = (ret_val.mean() * 252.0) / (ret_val.std() * np.sqrt(252.0) + 1e-10)
-    sh_te = (ret_test.mean() * 252.0) / (ret_test.std() * np.sqrt(252.0) + 1e-10)
-    
-    val_table = pd.DataFrame([
-        {"Segment": "Training (In-Sample)", "Period": f"{df_train.index[0].strftime('%Y-%m-%d')} to {df_train.index[-1].strftime('%Y-%m-%d')}", "CAGR": f"{cagr_tr:+.2f}%", "Sharpe": f"{sh_tr:.2f}", "Status": "In-Sample (Fitting)"},
-        {"Segment": "Validation", "Period": f"{df_validation.index[0].strftime('%Y-%m-%d')} to {df_validation.index[-1].strftime('%Y-%m-%d')}", "CAGR": f"{cagr_val:+.2f}%", "Sharpe": f"{sh_val:.2f}", "Status": "Validation"},
-        {"Segment": "Test (Out-of-Sample OOS)", "Period": f"{df_test.index[0].strftime('%Y-%m-%d')} to {df_test.index[-1].strftime('%Y-%m-%d')}", "CAGR": f"{cagr_te:+.2f}%", "Sharpe": f"{sh_te:.2f}", "Status": "★ Out-of-Sample True Test"}
-    ])
-    
-    st.dataframe(val_table, use_container_width=True, hide_index=True)
+    in_pos = False
+    entry_p = 0.0
+    peak_p = 0.0
+
+    for i in range(1, N_bars):
+        base_s = raw_sig_base.iloc[i-1]
+        c = close_vals[i]
+
+        if in_pos:
+            ret_from_entry = (c - entry_p) / entry_p
+            peak_p = max(peak_p, c)
+            ret_from_peak = (c - peak_p) / peak_p
+
+            hit_sl = use_sl and (ret_from_entry <= sl_pct)
+            hit_ts = use_ts and (ret_from_peak <= -ts_pct)
+            hit_tp = use_tp and (ret_from_entry >= tp_pct)
+
+            if hit_sl or hit_ts or hit_tp or (base_s == 0):
+                risk_pos[i] = 0
+                in_pos = False
+            else:
+                risk_pos[i] = 1
+        else:
+            if base_s > 0:
+                risk_pos[i] = 1
+                in_pos = True
+                entry_p = c
+                peak_p = c
+            else:
+                risk_pos[i] = 0
+
+    risk_pos_series = pd.Series(risk_pos, index=df_full.index)
+    cost_risk = risk_pos_series.diff().abs().fillna(0.0) * total_cost_per_trade
+    risk_strat_rets = risk_pos_series * res["daily_asset_rets"] - cost_risk
+    risk_equity = initial_capital * (1.0 + risk_strat_rets).cumprod()
+
+    peak_risk_eq = np.maximum.accumulate(risk_equity)
+    risk_dd = ((risk_equity - peak_risk_eq) / peak_risk_eq) * 100.0
+    risk_mdd = float(risk_dd.min())
+    risk_total_ret = float(((risk_equity.iloc[-1] - initial_capital) / initial_capital) * 100.0)
+
+    ro1, ro2, ro3, ro4 = st.columns(4)
+    with ro1:
+        st.metric("Base Strategy Net Return", f"{res['total_strat_ret']:+.2f}%")
+    with ro2:
+        st.metric("Risk-Managed Strategy Return", f"{risk_total_ret:+.2f}%")
+    with ro3:
+        st.metric("Base Strategy Max Drawdown", f"{res['max_dd_pct']:.2f}%")
+    with ro4:
+        st.metric("Risk-Managed Max Drawdown", f"{risk_mdd:.2f}%", delta=f"{risk_mdd - res['max_dd_pct']:+.2f}% MDD", delta_color="normal")
+
+    fig_ro = go.Figure()
+    fig_ro.add_trace(go.Scatter(x=res["dates"], y=res["strat_equity"], mode="lines", name="Base Strategy (Indicator Exits)", line=dict(color="#38BDF8", width=1.8)))
+    fig_ro.add_trace(go.Scatter(x=res["dates"], y=risk_equity, mode="lines", name="Risk-Managed Overlay (Active Stops)", line=dict(color="#00E676", width=2.2)))
+    fig_ro.update_layout(template="plotly_dark", height=400, title="Equity Curve: Base vs Risk-Managed Overlay", yaxis=dict(title=f"Equity ({currency_sym})"))
+    st.plotly_chart(fig_ro, width="stretch")
 
 # =========================================================
-# TAB 2: Optimization & Deflated Sharpe
+# TAB 4: Monte Carlo Trade Resampling
 # =========================================================
-with tab_opt:
-    st.subheader("⚡ Grid Search Parameter Optimization")
-    
-    if selected_strat in ["SMA Crossover", "EMA Crossover"]:
-        st.markdown("**Optimizing Fast Window vs Slow Window**")
-        fast_range = [10, 15, 20, 30]
-        slow_range = [40, 50, 75, 100]
+with tab_mc_resample:
+    st.subheader("🎲 Monte Carlo Trade Sequence Resampling")
+    st.caption("Bootstraps 1,000 randomized execution sequences of your historical trades to rule out lucky path dependency.")
+
+    trades_list = res["trades_df"]
+    if len(trades_list) >= 5:
+        trade_returns = trades_list["Return (%)"].values / 100.0
+        n_mc_sims = 1000
+        n_trade_count = len(trade_returns)
         
-        opt_results = []
-        for fw in fast_range:
-            for sw in slow_range:
-                if fw >= sw:
-                    continue
-                p_tmp = {"fast_window": fw, "slow_window": sw}
-                sig_tmp = generate_strategy_signals(df_full, selected_strat, p_tmp, long_only=(position_mode=="Long Only")).shift(1).fillna(0)
-                r_tmp = sig_tmp * daily_asset_rets - sig_tmp.diff().abs().fillna(0)*total_cost_per_trade
-                eq_tmp = (1.0 + r_tmp).cumprod()
-                sh_tmp = (r_tmp.mean() * 252.0) / (r_tmp.std() * np.sqrt(252.0) + 1e-10)
-                opt_results.append({"Fast": fw, "Slow": sw, "Sharpe": sh_tmp, "Total Return %": (eq_tmp.iloc[-1]-1.0)*100.0})
-                
-        opt_df = pd.DataFrame(opt_results)
-        best_opt = opt_df.loc[opt_df["Sharpe"].idxmax()]
+        mc_paths = np.zeros((n_trade_count + 1, n_mc_sims))
+        mc_paths[0] = initial_capital
+        mc_drawdowns = np.zeros(n_mc_sims)
         
-        o1, o2, o3 = st.columns(3)
-        o1.metric("Combinations Tested", f"{len(opt_df)}")
-        o2.metric("Best Parameters", f"Fast={best_opt['Fast']}, Slow={best_opt['Slow']}")
-        o3.metric("Best Sharpe Ratio", f"{best_opt['Sharpe']:.2f}")
-        
-        st.warning(f"⚠️ **Multiple-Testing Exposure Warning:** `{len(opt_df)}` parameter combinations tested. High trials increase data-snooping risk.")
-        
-        # Deflated Sharpe Ratio (DSR) Calculation
-        sharpe_best = float(best_opt['Sharpe'])
-        n_trials = len(opt_df)
-        gamma_const = 0.5772156649
-        e_max_sr = 0.5 * ((1 - gamma_const) * stats.norm.ppf(1 - 1/max(2, n_trials)) + gamma_const * stats.norm.ppf(1 - 1/(max(2, n_trials) * np.e)))
-        skew_val = float(stats.skew(daily_strat_rets))
-        kurt_val = float(stats.kurtosis(daily_strat_rets))
-        denom_dsr = np.sqrt(max(1e-6, 1 - skew_val * sharpe_best + ((kurt_val - 1)/4.0) * (sharpe_best ** 2)))
-        z_dsr = ((sharpe_best - e_max_sr) * np.sqrt(N - 1)) / denom_dsr
-        dsr_prob = float(stats.norm.cdf(z_dsr)) * 100.0
-        
-        st.info(f"🛡️ **Deflated Sharpe Ratio (DSR) Probability:** `{dsr_prob:.1f}%` likelihood that the best strategy Sharpe ratio is genuine and not an artifact of overfitting.")
+        for sim_i in range(n_mc_sims):
+            shuffled_rets = np.random.choice(trade_returns, size=n_trade_count, replace=True)
+            path_eq = initial_capital * np.cumprod(1.0 + shuffled_rets)
+            mc_paths[1:, sim_i] = path_eq
+            
+            p_peak = np.maximum.accumulate(path_eq)
+            p_dd = (path_eq - p_peak) / p_peak
+            mc_drawdowns[sim_i] = float(np.min(p_dd)) * 100.0
+
+        p5_mc = np.percentile(mc_paths, 5, axis=1)
+        p50_mc = np.percentile(mc_paths, 50, axis=1)
+        p95_mc = np.percentile(mc_paths, 95, axis=1)
+
+        prob_loss_mc = float(np.sum(mc_paths[-1] < initial_capital) / n_mc_sims * 100.0)
+        prob_dd20_mc = float(np.sum(mc_drawdowns < -20.0) / n_mc_sims * 100.0)
+
+        mc1, mc2, mc3, mc4 = st.columns(4)
+        with mc1:
+            st.metric("Probability of Ending in Loss", f"{prob_loss_mc:.1f}%")
+        with mc2:
+            st.metric("Prob of Max DD > 20%", f"{prob_dd20_mc:.1f}%")
+        with mc3:
+            st.metric("Median Terminal Outcome (P50)", f"{currency_sym}{np.median(mc_paths[-1]):,.2f}")
+        with mc4:
+            st.metric("5th Percentile Worst-Case (P5)", f"{currency_sym}{np.percentile(mc_paths[-1], 5):,.2f}")
+
+        t_steps = np.arange(n_trade_count + 1)
+        fig_mc_fan = go.Figure()
+        fig_mc_fan.add_trace(go.Scatter(x=t_steps, y=p95_mc, mode="lines", line=dict(width=0), showlegend=False))
+        fig_mc_fan.add_trace(go.Scatter(x=t_steps, y=p5_mc, mode="lines", line=dict(width=0), fill="tonexty", fillcolor="rgba(56, 189, 248, 0.15)", name="5% - 95% Confidence Corridor"))
+        fig_mc_fan.add_trace(go.Scatter(x=t_steps, y=p50_mc, mode="lines", line=dict(color="#00E676", width=2.5), name="Median Equity Path (P50)"))
+        fig_mc_fan.add_hline(y=initial_capital, line_dash="dash", line_color="#F8FAFC", annotation_text="Initial Capital")
+        fig_mc_fan.update_layout(template="plotly_dark", height=400, title=f"Monte Carlo Trade Resampling ({n_mc_sims} Iterations across {n_trade_count} Trades)", xaxis=dict(title="Trade Sequence Index"), yaxis=dict(title=f"Equity ({currency_sym})"))
+        st.plotly_chart(fig_mc_fan, width="stretch")
     else:
-        st.info("Grid search optimization is available for SMA Crossover and EMA Crossover strategies.")
+        st.info("At least 5 historical trades are required to perform Monte Carlo trade sequence resampling.")
 
 # =========================================================
-# TAB 3: Sensitivity Heatmap
+# TAB 5: Alpha, Beta & Capture Ratios
 # =========================================================
-with tab_sens:
-    st.subheader("🎯 Parameter Sensitivity Heatmap")
-    
+with tab_attribution:
+    st.subheader("🔬 Market Factor Attribution & Capture Ratios")
+    st.caption("Linear regression of strategy excess return against the market index to quantify true idiosyncratic alpha vs leveraged market beta.")
+
+    common_idx = res["dates"].intersection(market_bench_equity.index)
+    strat_r = res["daily_strat_rets"].loc[common_idx].values
+    mkt_r = market_bench_equity.pct_change().fillna(0.0).loc[common_idx].values
+
+    rf_day = 0.05 / 252.0
+    y_excess = strat_r - rf_day
+    x_excess = mkt_r - rf_day
+
+    cov_xy = float(np.cov(x_excess, y_excess)[0, 1])
+    var_x = float(np.var(x_excess, ddof=1)) if np.var(x_excess, ddof=1) > 0 else 1e-8
+    market_beta = cov_xy / var_x
+    alpha_daily = float(np.mean(y_excess) - market_beta * np.mean(x_excess))
+    jensen_alpha_ann = alpha_daily * 252.0 * 100.0
+
+    up_mask = x_excess > 0
+    down_mask = x_excess < 0
+    up_capture = (np.mean(y_excess[up_mask]) / np.mean(x_excess[up_mask])) * 100.0 if np.any(up_mask) and np.mean(x_excess[up_mask]) > 0 else 0.0
+    down_capture = (np.mean(y_excess[down_mask]) / np.mean(x_excess[down_mask])) * 100.0 if np.any(down_mask) and np.mean(x_excess[down_mask]) < 0 else 0.0
+
+    fa1, fa2, fa3, fa4 = st.columns(4)
+    with fa1:
+        st.metric("Jensen's Alpha (Annualized)", f"{jensen_alpha_ann:+.2f}%", help="True non-market excess alpha generated by strategy.")
+    with fa2:
+        st.metric("Market Beta (β)", f"{market_beta:.2f}", help="Sensitivity to broad market index movements.")
+    with fa3:
+        st.metric("Up-Market Capture Ratio", f"{up_capture:.1f}%", help="Percentage of market gains captured during green sessions.")
+    with fa4:
+        st.metric("Down-Market Capture Ratio", f"{down_capture:.1f}%", help="Percentage of market declines absorbed during red sessions.")
+
+    # Scatter Plot with Regression Line
+    fig_scatter = px.scatter(
+        x=x_excess * 100.0, y=y_excess * 100.0,
+        trendline="ols",
+        labels=dict(x=f"Market Excess Return (%) [{benchmark_choice}]", y="Strategy Excess Return (%)"),
+        title=f"Security Characteristic Line (SCL): Strategy vs {benchmark_choice}"
+    )
+    fig_scatter.update_layout(template="plotly_dark", height=380)
+    st.plotly_chart(fig_scatter, width="stretch")
+
+# =========================================================
+# TAB 6: Chronological 3-Way Split & Deflated Sharpe (DSR)
+# =========================================================
+with tab_split:
+    st.subheader("🧪 Chronological 3-Way Partition & Deflated Sharpe Ratio (DSR)")
+    st.caption("Splits data into Train (60%), Validation (20%), and Out-of-Sample Test (20%) with multiple-testing correction.")
+
+    N_tot = len(df_full)
+    n_train = int(0.60 * N_tot)
+    n_val = int(0.20 * N_tot)
+
+    df_tr = df_full.iloc[:n_train]
+    df_vl = df_full.iloc[n_train:n_train+n_val]
+    df_ts = df_full.iloc[n_train+n_val:]
+
+    tr_res = run_full_backtest(df_tr, selected_strat, strat_params, long_only=(position_mode=="Long Only"), comm_rate=total_cost_per_trade)
+    vl_res = run_full_backtest(df_vl, selected_strat, strat_params, long_only=(position_mode=="Long Only"), comm_rate=total_cost_per_trade)
+    ts_res = run_full_backtest(df_ts, selected_strat, strat_params, long_only=(position_mode=="Long Only"), comm_rate=total_cost_per_trade)
+
+    split_rows = [
+        {"Partition": "Training (In-Sample)", "Period": f"{df_tr.index[0].strftime('%Y-%m-%d')} to {df_tr.index[-1].strftime('%Y-%m-%d')}", "CAGR": f"{tr_res['cagr_strat']:+.2f}%", "Sharpe": f"{tr_res['sharpe']:.2f}", "Max DD": f"{tr_res['max_dd_pct']:.2f}%", "Role": "Model Calibration"},
+        {"Partition": "Validation", "Period": f"{df_vl.index[0].strftime('%Y-%m-%d')} to {df_vl.index[-1].strftime('%Y-%m-%d')}", "CAGR": f"{vl_res['cagr_strat']:+.2f}%", "Sharpe": f"{vl_res['sharpe']:.2f}", "Max DD": f"{vl_res['max_dd_pct']:.2f}%", "Role": "Hyperparameter Tuning"},
+        {"Partition": "Out-of-Sample Test (OOS)", "Period": f"{df_ts.index[0].strftime('%Y-%m-%d')} to {df_ts.index[-1].strftime('%Y-%m-%d')}", "CAGR": f"{ts_res['cagr_strat']:+.2f}%", "Sharpe": f"{ts_res['sharpe']:.2f}", "Max DD": f"{ts_res['max_dd_pct']:.2f}%", "Role": "★ True Unseen Test"}
+    ]
+    st.dataframe(pd.DataFrame(split_rows), width="stretch", hide_index=True)
+
+    # Deflated Sharpe Ratio calculation
+    sh_best = max(tr_res["sharpe"], vl_res["sharpe"], ts_res["sharpe"])
+    n_trials = 10
+    gamma_c = 0.5772156649
+    e_max = 0.5 * ((1 - gamma_c) * stats.norm.ppf(1 - 1/n_trials) + gamma_c * stats.norm.ppf(1 - 1/(n_trials * np.e)))
+    sk_val = float(stats.skew(res["daily_strat_rets"]))
+    kt_val = float(stats.kurtosis(res["daily_strat_rets"]))
+    denom_dsr = np.sqrt(max(1e-6, 1 - sk_val * sh_best + ((kt_val - 1)/4.0) * (sh_best ** 2)))
+    z_dsr = ((sh_best - e_max) * np.sqrt(N_tot - 1)) / denom_dsr
+    dsr_p = float(stats.norm.cdf(z_dsr)) * 100.0
+
+    st.info(f"🛡️ **Deflated Sharpe Ratio (DSR):** `{dsr_p:.1f}%` probability that strategy outperformance is genuine after accounting for trial multiplicity and non-normal return distributions.")
+
+# =========================================================
+# TAB 7: Parameter Sensitivity Heatmap
+# =========================================================
+with tab_sensitivity:
+    st.subheader("🔥 Parameter Sensitivity 2D Grid Surface")
+    st.caption("Evaluates parameter neighborhood stability to ensure results lie on a broad plateau rather than an overfitted spike.")
+
     if selected_strat in ["SMA Crossover", "EMA Crossover"]:
-        fast_grid = [5, 10, 15, 20, 25, 30]
-        slow_grid = [30, 40, 50, 60, 75, 100]
+        f_grid = [5, 10, 15, 20, 25, 30]
+        s_grid = [30, 40, 50, 60, 75, 100]
+        heat_arr = np.zeros((len(s_grid), len(f_grid)))
         
-        matrix_data = np.zeros((len(slow_grid), len(fast_grid)))
-        for i, sw in enumerate(slow_grid):
-            for j, fw in enumerate(fast_grid):
+        for i_s, sw in enumerate(s_grid):
+            for j_f, fw in enumerate(f_grid):
                 if fw >= sw:
-                    matrix_data[i, j] = np.nan
+                    heat_arr[i_s, j_f] = np.nan
                 else:
-                    p_tmp = {"fast_window": fw, "slow_window": sw}
-                    sig_tmp = generate_strategy_signals(df_full, selected_strat, p_tmp, long_only=(position_mode=="Long Only")).shift(1).fillna(0)
-                    r_tmp = sig_tmp * daily_asset_rets - sig_tmp.diff().abs().fillna(0)*total_cost_per_trade
-                    sh_tmp = (r_tmp.mean() * 252.0) / (r_tmp.std() * np.sqrt(252.0) + 1e-10)
-                    matrix_data[i, j] = sh_tmp
-                    
+                    t_p = {"fast_window": fw, "slow_window": sw}
+                    t_eval = run_full_backtest(df_full, selected_strat, t_p, long_only=(position_mode=="Long Only"), comm_rate=total_cost_per_trade)
+                    heat_arr[i_s, j_f] = t_eval["sharpe"]
+
         fig_hm = px.imshow(
-            matrix_data, x=[str(x) for x in fast_grid], y=[str(y) for y in slow_grid],
-            labels=dict(x="Fast Window", y="Slow Window", color="Sharpe"),
-            text_auto=".2f", color_continuous_scale="RdYlGn"
+            heat_arr, x=[str(x) for x in f_grid], y=[str(y) for y in s_grid],
+            labels=dict(x="Fast Window", y="Slow Window", color="Sharpe Ratio"),
+            text_auto=".2f", color_continuous_scale="RdYlGn",
+            title=f"{selected_strat} Sensitivity Surface"
         )
-        fig_hm.update_layout(
-            template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.6)",
-            height=380, margin=dict(l=20, r=20, t=30, b=20)
-        )
-        st.plotly_chart(fig_hm, use_container_width=True)
-        st.caption("💡 **Interpretation:** A broad green plateau indicates a robust parameter region; isolated sharp peaks indicate potential overfitting.")
+        fig_hm.update_layout(template="plotly_dark", height=400)
+        st.plotly_chart(fig_hm, width="stretch")
     else:
         st.info("Sensitivity heatmaps are available for Moving Average Crossover strategies.")
 
 # =========================================================
-# TAB 4: Regime-Conditional Backtest
+# TAB 8: Trade Execution Log & CSV Tearsheet
 # =========================================================
-with tab_regime:
-    st.subheader("📊 HMM Market Regime Conditioning")
+with tab_trades:
+    st.subheader("📋 Trade Execution Order Log")
+    tr_df = res["trades_df"]
     
-    X_ret = daily_asset_rets.values.reshape(-1, 1)
-    try:
-        hmm_mod = GaussianHMM(n_components=3, covariance_type="full", n_iter=1000, random_state=42)
-        hmm_mod.fit(X_ret)
-        regime_states = hmm_mod.predict(X_ret)
-        
-        reg_rows = []
-        for r_k in range(3):
-            mask_k = (regime_states == r_k)
-            k_count = np.sum(mask_k)
-            pct_days = (k_count / N) * 100.0
-            
-            r_rets = daily_strat_rets[mask_k]
-            avg_d_ret = r_rets.mean() * 100.0 if len(r_rets) > 0 else 0.0
-            ann_cagr = (((1.0 + r_rets.mean()) ** 252) - 1.0) * 100.0 if len(r_rets) > 0 else 0.0
-            r_sharpe = (r_rets.mean() * 252) / (r_rets.std() * np.sqrt(252) + 1e-10) if len(r_rets) > 0 else 0.0
-            
-            reg_rows.append({
-                "Regime": f"Regime {r_k}",
-                "% Days": f"{pct_days:.1f}%",
-                "Avg Daily Return": f"{avg_d_ret:+.3f}%",
-                "Annualized CAGR": f"{ann_cagr:+.2f}%",
-                "Regime Sharpe": f"{r_sharpe:.2f}",
-                "Observations": str(k_count)
-            })
-            
-        st.dataframe(pd.DataFrame(reg_rows), use_container_width=True, hide_index=True)
-        st.caption("📌 **Disclaimer:** Retrospective regime fitting describes historical statistical environments; it does not represent real-time predictive forecasting.")
-    except Exception:
-        st.info("HMM regime detection fitting encountered insufficient sample variance.")
+    if not tr_df.empty:
+        st.dataframe(tr_df, width="stretch", hide_index=True)
+        csv_trades = tr_df.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            label=f"📥 Download Trade Log CSV ({ticker})",
+            data=csv_trades,
+            file_name=f"backtest_trades_{ticker}_{selected_strat}.csv",
+            mime="text/csv",
+            width="stretch",
+            key="btn_dl_bt_trades_csv"
+        )
+    else:
+        st.info("No trades executed during this timeframe.")
+
+# ---------------------------------------------------------
+# Daily Equity Curve CSV Export
+# ---------------------------------------------------------
+st.markdown("---")
+export_eq_df = pd.DataFrame({
+    "Date": res["dates"].strftime("%Y-%m-%d"),
+    "Strategy_Equity": res["strat_equity"].values,
+    "Buy_Hold_Equity": res["buy_hold_equity"].values,
+    "Market_Benchmark_Equity": market_bench_equity.values,
+    "Daily_Strategy_Return": res["daily_strat_rets"].values,
+    "Drawdown_Pct": res["drawdown_series"].values
+})
+
+st.download_button(
+    label="📥 Export Full Backtest Equity Curve (CSV)",
+    data=export_eq_df.to_csv(index=False).encode("utf-8"),
+    file_name=f"backtest_equity_{ticker}_{selected_strat}_{datetime.date.today().strftime('%Y%m%d')}.csv",
+    mime="text/csv",
+    width="stretch",
+    key="btn_dl_bt_equity_csv"
+)
+
+st.markdown("<div style='text-align: center; margin-top: 15px; color: #64748B; font-size: 0.78rem;'><i>QuantTerminal Backtesting Engine • Institutional algorithmic validation framework. Not financial advice.</i></div>", unsafe_allow_html=True)

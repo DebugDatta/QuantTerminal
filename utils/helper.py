@@ -172,7 +172,12 @@ def fetch_stocks(region="India"):
         return pd.DataFrame(columns=["Symbol", "Description", "ISIN", "Exchange", "Market capitalization"])
     df = pd.read_csv(csv_path)
     cols_to_keep = [c for c in ["Symbol", "Description", "ISIN", "Exchange", "Sector", "Market capitalization"] if c in df.columns]
-    return df[cols_to_keep]
+    res_df = df[cols_to_keep]
+    # Filter out header-like or invalid rows to prevent spurious Yahoo Finance queries
+    if "Symbol" in res_df.columns:
+        invalid_symbols = {"SYMBOL", "DESCRIPTION", "ISIN", "EXCHANGE", "SECTOR", "MARKET", "CAPITALIZATION", "NAN"}
+        res_df = res_df[~res_df["Symbol"].astype(str).str.strip().str.upper().isin(invalid_symbols)]
+    return res_df
 
 def categorize_market_cap(row, region="India"):
     """Categorize stock into Large Cap, Mid Cap, Small Cap, or Micro Cap based on Market capitalization."""
