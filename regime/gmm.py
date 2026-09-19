@@ -26,7 +26,7 @@ def fit_gmm(
     labels = model.predict(X)
     probs = model.predict_proba(X)
     means = model.means_.flatten()
-    covars = model.covars_.flatten()
+    covars = model.covariances_.flatten()
     weights = model.weights_
 
     order = np.argsort(means)

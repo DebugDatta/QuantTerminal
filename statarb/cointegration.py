@@ -196,9 +196,10 @@ def engle_granger(series_a: pd.Series, series_b: pd.Series) -> dict:
     residual = y - (alpha + beta * x)
 
     result = coint(y, x, trend="c", autolag="aic")
-    statistic = float(result.coint_t)
-    p_value = float(result.pvalue)
-    crit = np.asarray(result.critical_values, dtype=float)
+    statistic, p_value, crit_array = result
+    statistic = float(statistic)
+    p_value = float(p_value)
+    crit = np.asarray(crit_array, dtype=float)
 
     return {
         "test_statistic": statistic,

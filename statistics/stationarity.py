@@ -54,13 +54,14 @@ def adf_test(returns: pd.Series) -> dict:
       implementation choices, not documented.
     """
     data = _clean_series(returns)
-    result = adfuller(data, maxlag=None, regression="c", autolag="AIC", result_object=True)
+    result = adfuller(data, maxlag=None, regression="c", autolag="AIC")
+    statistic, pvalue, usedlag, nobs, critical_values, _ = result
     return {
-        "test_statistic": float(result.statistic),
-        "p_value": float(result.pvalue),
-        "critical_values": _critical(dict(result.critical_values)),
-        "is_stationary": bool(result.pvalue < 0.05),
-        "used_lag": int(result.lags),
+        "test_statistic": float(statistic),
+        "p_value": float(pvalue),
+        "critical_values": _critical(critical_values),
+        "is_stationary": bool(pvalue < 0.05),
+        "used_lag": int(usedlag),
     }
 
 
@@ -80,12 +81,22 @@ def kpss_test(returns: pd.Series) -> dict:
       the documented {1%,5%,10%}.
     """
     data = _clean_series(returns)
-    result = kpss(data, regression="c", nlags="auto", result_object=True)
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        result = kpss(data, regression="c", nlags="auto")
+    statistic, pvalue, n_lags, critical_values = result
+    # KPSS critical_values has keys like '10%', '5%', '2.5%', '1%'
+    # Map to documented {1%, 5%, 10%}
+    mapped = {}
+    for key, target in [('1%', '1%'), ('5%', '5%'), ('10%', '10%')]:
+        if key in critical_values:
+            mapped[target] = critical_values[key]
     return {
-        "test_statistic": float(result.statistic),
-        "p_value": float(result.pvalue),
-        "critical_values": _critical(dict(result.critical_values)),
-        "is_stationary": bool(result.pvalue > 0.05),
+        "test_statistic": float(statistic),
+        "p_value": float(pvalue),
+        "critical_values": mapped if mapped else _critical(critical_values),
+        "is_stationary": bool(pvalue > 0.05),
     }
 
 

@@ -20,10 +20,10 @@ def fit_arima(
         if seasonal_order:
             model = SARIMAX(data, order=order, seasonal_order=seasonal_order,
                           enforce_stationarity=False, enforce_invertibility=False)
+            result = model.fit(disp=False)
         else:
             model = ARIMA(data, order=order)
-
-        result = model.fit(disp=False)
+            result = model.fit()
 
         return {
             "model": result,
