@@ -34,27 +34,18 @@ import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
 
-MIN_FEATURES = 2
-MIN_COMPLETE_OBSERVATIONS = 3
+from statistics._common import (
+    clean_frame,
+    validate_multi_asset,
+    MIN_ASSETS,
+    MIN_COMPLETE_OBSERVATIONS,
+)
 
-
-def _clean_frame(returns: pd.DataFrame) -> pd.DataFrame:
-    if not isinstance(returns, pd.DataFrame):
-        raise TypeError("returns must be a pandas DataFrame")
-    return returns.dropna(axis=0, how="any")
+MIN_FEATURES = MIN_ASSETS
 
 
 def _validate(clean: pd.DataFrame, n_components: int) -> None:
-    if clean.shape[1] < MIN_FEATURES:
-        raise ValueError(
-            "PCA requires at least 2 feature columns; "
-            f"got {clean.shape[1]}"
-        )
-    if clean.shape[0] < MIN_COMPLETE_OBSERVATIONS:
-        raise ValueError(
-            "PCA requires at least 3 complete observations; "
-            f"got {clean.shape[0]}"
-        )
+    validate_multi_asset(clean, MIN_FEATURES, MIN_COMPLETE_OBSERVATIONS, "PCA")
     if isinstance(n_components, bool) or not isinstance(
         n_components, (int, np.integer)
     ):
@@ -133,7 +124,7 @@ def pca_decomposition(returns: pd.DataFrame, n_components: int = 2) -> dict:
       (= ``scores @ components_``). [Assumption: the docs' "scores @ loadings"
       phrasing omits the transpose required by the pinned loadings layout.]
     """
-    clean = _clean_frame(returns)
+    clean = clean_frame(returns)
     _validate(clean, n_components)
     k = int(n_components)
 
@@ -200,7 +191,7 @@ def scree_data(returns: pd.DataFrame) -> dict:
     - Centering/scaling, listwise NaN removal, and minimum-data guards are as
       documented in pca_decomposition above.
     """
-    clean = _clean_frame(returns)
+    clean = clean_frame(returns)
     _validate(clean, 1)
 
     model = PCA(n_components=None)

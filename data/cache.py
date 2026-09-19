@@ -3,10 +3,13 @@
 import time
 import hashlib
 import json
+import logging
 from pathlib import Path
 from typing import Optional
 
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 CACHE_DIR = Path.home() / ".cache" / "quantterminal"
 DEFAULT_TTL = 3600  # 1 hour
@@ -35,8 +38,8 @@ def cached_load(
         if time.time() - meta.get("timestamp", 0) < ttl:
             try:
                 return pd.read_parquet(cache_file)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to load cache for {ticker}: {e}")
     return None
 
 
@@ -50,8 +53,8 @@ def save_cache(ticker: str, period: str, interval: str, df: pd.DataFrame) -> Non
     try:
         df.to_parquet(cache_file)
         meta_file.write_text(json.dumps({"timestamp": time.time()}))
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to save cache for {ticker}: {e}")
 
 
 def clear_cache() -> int:

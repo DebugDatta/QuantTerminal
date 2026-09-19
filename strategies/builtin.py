@@ -19,7 +19,7 @@ class BuyAndHold(Strategy):
 
 class SMACrossover(Strategy):
     name = "SMA Crossover"
-    params = {"fast_window": 20, "slow_window": 50}
+    _default_params = {"fast_window": 20, "slow_window": 50}
     def generate_signals(self, df: pd.DataFrame) -> pd.Series:
         fast = sma(df["Close"], self.params["fast_window"])
         slow = sma(df["Close"], self.params["slow_window"])
@@ -31,7 +31,7 @@ class SMACrossover(Strategy):
 
 class EMACrossover(Strategy):
     name = "EMA Crossover"
-    params = {"fast_window": 12, "slow_window": 26}
+    _default_params = {"fast_window": 12, "slow_window": 26}
     def generate_signals(self, df: pd.DataFrame) -> pd.Series:
         fast = ema(df["Close"], self.params["fast_window"])
         slow = ema(df["Close"], self.params["slow_window"])
@@ -43,7 +43,7 @@ class EMACrossover(Strategy):
 
 class RSIStrategy(Strategy):
     name = "RSI"
-    params = {"rsi_window": 14, "oversold": 30, "overbought": 70}
+    _default_params = {"rsi_window": 14, "oversold": 30, "overbought": 70}
     def generate_signals(self, df: pd.DataFrame) -> pd.Series:
         r = rsi(df["Close"], self.params["rsi_window"])
         signals = pd.Series(0, index=df.index)
@@ -66,7 +66,7 @@ class RSIStrategy(Strategy):
 
 class MACDStrategy(Strategy):
     name = "MACD"
-    params = {"fast": 12, "slow": 26, "signal": 9}
+    _default_params = {"fast": 12, "slow": 26, "signal": 9}
     def generate_signals(self, df: pd.DataFrame) -> pd.Series:
         m = macd(df["Close"], self.params["fast"], self.params["slow"], self.params["signal"])
         cross = m["macd"] - m["signal"]
@@ -78,7 +78,7 @@ class MACDStrategy(Strategy):
 
 class BollingerBandsStrategy(Strategy):
     name = "Bollinger Bands"
-    params = {"window": 20, "num_std": 2}
+    _default_params = {"window": 20, "num_std": 2}
     def generate_signals(self, df: pd.DataFrame) -> pd.Series:
         bb = bollinger_bands(df["Close"], self.params["window"], self.params["num_std"])
         signals = pd.Series(0, index=df.index)
@@ -101,7 +101,7 @@ class BollingerBandsStrategy(Strategy):
 
 class DonchianBreakout(Strategy):
     name = "Donchian Breakout"
-    params = {"window": 20}
+    _default_params = {"window": 20}
     def generate_signals(self, df: pd.DataFrame) -> pd.Series:
         upper = df["High"].rolling(self.params["window"]).max()
         lower = df["Low"].rolling(self.params["window"]).min()
@@ -113,7 +113,7 @@ class DonchianBreakout(Strategy):
 
 class MomentumStrategy(Strategy):
     name = "Momentum"
-    params = {"window": 20}
+    _default_params = {"window": 20}
     def generate_signals(self, df: pd.DataFrame) -> pd.Series:
         ret = df["Close"].pct_change(self.params["window"])
         signals = pd.Series(0, index=df.index)
@@ -124,27 +124,65 @@ class MomentumStrategy(Strategy):
 
 class MeanReversionZScore(Strategy):
     name = "Mean Reversion Z-Score"
-    params = {"window": 20, "entry_z": 2.0, "exit_z": 0.5}
+    _default_params = {"window": 20, "entry_z": 2.0, "exit_z": 0.5}
     def generate_signals(self, df: pd.DataFrame) -> pd.Series:
         mean = df["Close"].rolling(self.params["window"]).mean()
         std = df["Close"].rolling(self.params["window"]).std()
         z = (df["Close"] - mean) / (std + 1e-10)
         signals = pd.Series(0, index=df.index)
-        signals[z < -self.params["entry_z"]] = 1
-        signals[z > self.params["entry_z"]] = -1
+        in_position = 0
+        for i in range(len(z)):
+            if in_position == 0:
+                if z.iloc[i] < -self.params["entry_z"]:
+                    signals.iloc[i] = 1
+                    in_position = 1
+                elif z.iloc[i] > self.params["entry_z"]:
+                    signals.iloc[i] = -1
+                    in_position = -1
+            elif in_position == 1:
+                if z.iloc[i] > -self.params["exit_z"]:
+                    signals.iloc[i] = -1
+                    in_position = 0
+                else:
+                    signals.iloc[i] = 1
+            elif in_position == -1:
+                if z.iloc[i] < self.params["exit_z"]:
+                    signals.iloc[i] = 1
+                    in_position = 0
+                else:
+                    signals.iloc[i] = -1
         return signals
 
 
 class PairTrading(Strategy):
-    name = "Pair Trading"
-    params = {"window": 20, "entry_z": 2.0}
+    name = "Spread Mean Reversion"
+    _default_params = {"window": 20, "entry_z": 2.0, "exit_z": 0.5}
     def generate_signals(self, df: pd.DataFrame) -> pd.Series:
         spread = df["Close"] - df["Close"].rolling(self.params["window"]).mean()
         std = spread.rolling(self.params["window"]).std()
         z = spread / (std + 1e-10)
         signals = pd.Series(0, index=df.index)
-        signals[z > self.params["entry_z"]] = -1
-        signals[z < -self.params["entry_z"]] = 1
+        in_position = 0
+        for i in range(len(z)):
+            if in_position == 0:
+                if z.iloc[i] < -self.params["entry_z"]:
+                    signals.iloc[i] = 1
+                    in_position = 1
+                elif z.iloc[i] > self.params["entry_z"]:
+                    signals.iloc[i] = -1
+                    in_position = -1
+            elif in_position == 1:
+                if z.iloc[i] > -self.params["exit_z"]:
+                    signals.iloc[i] = -1
+                    in_position = 0
+                else:
+                    signals.iloc[i] = 1
+            elif in_position == -1:
+                if z.iloc[i] < self.params["exit_z"]:
+                    signals.iloc[i] = 1
+                    in_position = 0
+                else:
+                    signals.iloc[i] = -1
         return signals
 
 
@@ -170,7 +208,7 @@ STRATEGY_MAP = {
     "Donchian Breakout": DonchianBreakout,
     "Momentum": MomentumStrategy,
     "Mean Reversion Z-Score": MeanReversionZScore,
-    "Pair Trading": PairTrading,
+    "Spread Mean Reversion": PairTrading,
     "Breakout": BreakoutStrategy,
 }
 

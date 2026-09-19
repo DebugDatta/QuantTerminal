@@ -25,11 +25,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-
-def _clean_series(returns: pd.Series) -> pd.Series:
-    if not isinstance(returns, pd.Series):
-        raise TypeError("returns must be a pandas Series")
-    return returns.dropna()
+from statistics._common import clean_series
 
 
 def _grid(data: pd.Series, points: int = 200) -> np.ndarray:
@@ -79,7 +75,7 @@ def distribution_data(returns: pd.Series) -> dict:
         value cannot support a density - a ValueError is raised rather than
         returning a degenerate curve.
     """
-    data = _clean_series(returns)
+    data = clean_series(returns)
     if data.nunique() < 2:
         raise ValueError(
             "distribution_data requires at least 2 distinct observations "
@@ -129,7 +125,7 @@ def qq_data(returns: pd.Series) -> dict:
       * no reference/fitted line is returned (docs do not require one)
       * NaNs dropped; a single observation still yields a valid single point.
     """
-    data = _clean_series(returns)
+    data = clean_series(returns)
     if len(data) == 0:
         raise ValueError("qq_data requires at least one observation")
 

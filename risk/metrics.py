@@ -44,6 +44,8 @@ import numpy as np
 import pandas as pd
 from scipy.stats import norm
 
+from statistics._common import clean_series
+
 MIN_OBSERVATIONS = 2
 DEFAULT_CONFIDENCE = 0.95
 MIN_CONFIDENCE = 0.90
@@ -51,10 +53,8 @@ MAX_CONFIDENCE = 0.99
 TAIL_PERCENTILE = 0.05
 
 
-def _clean_series(returns: pd.Series) -> np.ndarray:
-    if not isinstance(returns, pd.Series):
-        raise TypeError("returns must be a pandas Series")
-    data = returns.dropna().to_numpy(dtype=float)
+def _clean_to_numpy(returns: pd.Series) -> np.ndarray:
+    data = clean_series(returns).to_numpy(dtype=float)
     if data.size < MIN_OBSERVATIONS:
         raise ValueError(
             f"at least {MIN_OBSERVATIONS} observations are required; "
@@ -96,7 +96,7 @@ def value_at_risk(
       inference; the docs only state the percentile definition.
     - Parametric uses the sample standard deviation (ddof=1), an inference.
     """
-    data = _clean_series(returns)
+    data = _clean_to_numpy(returns)
     c = _confidence(confidence_level)
     historical = float(np.percentile(data, 100.0 * (1.0 - c)))
     mu = float(np.mean(data))
@@ -121,7 +121,7 @@ def conditional_var(
 
     Output keys: cvar, var, confidence_level, n.
     """
-    data = _clean_series(returns)
+    data = _clean_to_numpy(returns)
     c = _confidence(confidence_level)
     var = float(np.percentile(data, 100.0 * (1.0 - c)))
     tail = data[data < var]
@@ -142,7 +142,7 @@ def tail_risk(returns: pd.Series) -> dict:
 
     Output keys: tail_ratio, left_mean, right_mean, n.
     """
-    data = _clean_series(returns)
+    data = _clean_to_numpy(returns)
     left_threshold = float(np.percentile(data, 100.0 * TAIL_PERCENTILE))
     right_threshold = float(np.percentile(data, 100.0 * (1.0 - TAIL_PERCENTILE)))
     left = data[data < left_threshold]

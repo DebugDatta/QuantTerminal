@@ -1,10 +1,12 @@
 """Yahoo Finance data loader: resolve tickers, load OHLCV, search stocks."""
 
+import functools
 import pandas as pd
 import yfinance as yf
 from typing import Optional, List
 
 
+@functools.lru_cache(maxsize=128)
 def resolve_ticker(symbol: str, exchange: str = "Auto") -> str:
     """Resolve user input to a valid Yahoo Finance ticker.
 
@@ -12,6 +14,8 @@ def resolve_ticker(symbol: str, exchange: str = "Auto") -> str:
     NSE: Append .NS
     BSE: Append .BO
     GLOBAL: Use as-is
+    
+    Results are cached to avoid repeated network calls.
     """
     if exchange == "NSE":
         return f"{symbol}.NS"

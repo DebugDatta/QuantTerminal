@@ -19,27 +19,16 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-MIN_ASSET_COLUMNS = 2
-MIN_COMPLETE_OBSERVATIONS = 3
-
-
-def _clean_frame(returns: pd.DataFrame) -> pd.DataFrame:
-    if not isinstance(returns, pd.DataFrame):
-        raise TypeError("returns must be a pandas DataFrame")
-    return returns.dropna(axis=0, how="any")
+from statistics._common import (
+    clean_frame,
+    validate_multi_asset,
+    MIN_ASSET_COLUMNS,
+    MIN_COMPLETE_OBSERVATIONS,
+)
 
 
 def _validate(clean: pd.DataFrame) -> None:
-    if clean.shape[1] < MIN_ASSET_COLUMNS:
-        raise ValueError(
-            "correlation/covariance requires at least 2 asset columns; "
-            f"got {clean.shape[1]}"
-        )
-    if clean.shape[0] < MIN_COMPLETE_OBSERVATIONS:
-        raise ValueError(
-            "correlation/covariance requires at least 3 complete observations; "
-            f"got {clean.shape[0]}"
-        )
+    validate_multi_asset(clean, MIN_ASSET_COLUMNS, MIN_COMPLETE_OBSERVATIONS, "correlation/covariance")
 
 
 def _pairwise(
@@ -104,7 +93,7 @@ def correlation_matrix(returns: pd.DataFrame) -> dict:
     - Minimum guards (not documented): at least 2 asset columns and at least
       3 complete observations for valid inferential p-values.
     """
-    clean = _clean_frame(returns)
+    clean = clean_frame(returns)
     _validate(clean)
 
     pearson_corr, pearson_pval = _pairwise(clean, stats.pearsonr)
@@ -147,7 +136,7 @@ def covariance_matrix(returns: pd.DataFrame) -> pd.DataFrame:
     - Minimum guards mirror correlation_matrix: at least 2 asset columns and
       at least 3 complete observations.
     """
-    clean = _clean_frame(returns)
+    clean = clean_frame(returns)
     _validate(clean)
 
     cov = np.cov(clean.to_numpy(dtype=float).T, ddof=1)

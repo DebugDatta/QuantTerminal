@@ -38,15 +38,11 @@ from statsmodels.tsa.seasonal import seasonal_decompose
 from statsmodels.tsa.stattools import acf as _sm_acf
 from statsmodels.tsa.stattools import pacf as _sm_pacf
 
+from statistics._common import clean_series
+
 MIN_PERIOD = 2
 MIN_CYCLES = 2
 CONFIDENCE_Z = 1.96
-
-
-def _clean_series(series: pd.Series) -> pd.Series:
-    if not isinstance(series, pd.Series):
-        raise TypeError("series must be a pandas Series")
-    return series.dropna()
 
 
 def _validate_lags(lags: int, n: int) -> int:
@@ -69,13 +65,13 @@ def acf(series: pd.Series, lags: int = 40) -> dict:
 
     Output keys: lags, acf, band, n.
     """
-    data = _clean_series(series)
+    data = clean_series(series)
     k = _validate_lags(lags, len(data))
     lags_ar = np.arange(k + 1, dtype=int)
-    result = _sm_acf(data, nlags=k, adjusted=False, result_object=True)
+    acf_vals = _sm_acf(data, nlags=k, adjusted=False)
     return {
         "lags": lags_ar,
-        "acf": np.asarray(result.acf, dtype=float),
+        "acf": np.asarray(acf_vals, dtype=float),
         "band": CONFIDENCE_Z / np.sqrt(len(data)),
         "n": int(len(data)),
     }
@@ -90,13 +86,13 @@ def pacf(series: pd.Series, lags: int = 40) -> dict:
 
     Output keys: lags, pacf, band, n.
     """
-    data = _clean_series(series)
+    data = clean_series(series)
     k = _validate_lags(lags, len(data))
     lags_ar = np.arange(k + 1, dtype=int)
-    result = _sm_pacf(data, nlags=k, method="ywm", result_object=True)
+    pacf_vals = _sm_pacf(data, nlags=k, method="ywm")
     return {
         "lags": lags_ar,
-        "pacf": np.asarray(result.pacf, dtype=float),
+        "pacf": np.asarray(pacf_vals, dtype=float),
         "band": CONFIDENCE_Z / np.sqrt(len(data)),
         "n": int(len(data)),
     }
@@ -128,7 +124,7 @@ def decompose(series: pd.Series, model: str = "additive", period: int = 5) -> di
     - trend and resid contain NaN at the edges, matching seasonal_decompose
       behavior.
     """
-    data = _clean_series(series)
+    data = clean_series(series)
     if model not in ("additive", "multiplicative"):
         raise ValueError(
             "model must be 'additive' or 'multiplicative'; got "

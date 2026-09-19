@@ -173,7 +173,9 @@ def rolling_beta(
     _require_observations(len(joined), w, "aligned returns/benchmark")
     cov = joined[_RETURNS_COL].rolling(w).cov(joined[_BENCHMARK_COL])
     var = joined[_BENCHMARK_COL].rolling(w).var()
-    return cov / var
+    result = cov / var
+    result = result.replace([np.inf, -np.inf], np.nan)
+    return result
 
 
 def rolling_vol(

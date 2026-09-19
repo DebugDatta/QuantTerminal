@@ -25,13 +25,9 @@ import pandas as pd
 from arch.unitroot import PhillipsPerron, ZivotAndrews
 from statsmodels.tsa.stattools import adfuller, kpss
 
+from statistics._common import clean_series
+
 MIN_ZIVOT_ANDREWS_OBS = 100
-
-
-def _clean_series(returns: pd.Series) -> pd.Series:
-    if not isinstance(returns, pd.Series):
-        raise TypeError("returns must be a pandas Series")
-    return returns.dropna()
 
 
 def _critical(values: dict) -> dict[str, float]:
@@ -53,7 +49,7 @@ def adf_test(returns: pd.Series) -> dict:
     - Defaults regression='c' (constant only) and autolag='AIC' are
       implementation choices, not documented.
     """
-    data = _clean_series(returns)
+    data = clean_series(returns)
     result = adfuller(data, maxlag=None, regression="c", autolag="AIC")
     statistic, pvalue, usedlag, nobs, critical_values, _ = result
     return {
@@ -80,7 +76,7 @@ def kpss_test(returns: pd.Series) -> dict:
     - Critical values are mapped from statsmodels' {10%,5%,2.5%,1%} set to
       the documented {1%,5%,10%}.
     """
-    data = _clean_series(returns)
+    data = clean_series(returns)
     import warnings
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -116,7 +112,7 @@ def pp_test(returns: pd.Series) -> dict:
       this mapping is an inference.
     - Defaults trend='c', test_type='tau' are implementation choices.
     """
-    data = _clean_series(returns)
+    data = clean_series(returns)
     result = PhillipsPerron(data)
     return {
         "test_statistic": float(result.stat),
@@ -148,7 +144,7 @@ def zivot_andrews(returns: pd.Series) -> dict:
       statistic vector that the underlying library minimizes; mapping it to
       an index label is an inference.
     """
-    data = _clean_series(returns)
+    data = clean_series(returns)
     if len(data) < MIN_ZIVOT_ANDREWS_OBS:
         raise ValueError(
             "zivot_andrews requires at least 100 observations (documented "

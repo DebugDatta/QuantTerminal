@@ -84,7 +84,7 @@ def test_normal_x_y_same_length_and_nonempty():
 def test_kde_integrates_to_about_one():
     result = distribution_data(_normal())
     grid = np.asarray(result["kde"]["x"])
-    integral = np.trapezoid(result["kde"]["y"], grid)
+    integral = np.trapz(result["kde"]["y"], grid)
     assert integral == pytest.approx(1.0, abs=0.05)
 
 

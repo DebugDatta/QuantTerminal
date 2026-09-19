@@ -22,6 +22,7 @@ import streamlit as st
 import plotly.graph_objects as go
 
 from utils.helper import inject_custom_theme, load_data
+from data.loader import resolve_ticker
 from core.returns import compute_returns
 from core.metrics import (
     sharpe_ratio,
@@ -121,25 +122,9 @@ def _safe_dict(fn, *args, **kwargs):
     return result if isinstance(result, dict) else None
 
 
-# ── Ticker / benchmark resolution (local; resolve_ticker is missing) ─────────
+# ── Ticker / benchmark resolution ─────────────────────────────────────────────
 def _is_qualified(ticker):
     return ("." in ticker) or ticker.startswith("^")
-
-
-def _resolve_ticker(raw, exchange):
-    ticker = str(raw or "").strip()
-    if not ticker:
-        return ""
-    exchange = str(exchange or "Auto")
-    if exchange == "Global":
-        return ticker
-    if exchange == "NSE":
-        return ticker if _is_qualified(ticker) else f"{ticker}.NS"
-    if exchange == "BSE":
-        return ticker if _is_qualified(ticker) else f"{ticker}.BO"
-    # Auto: preserve an already qualified ticker (index or suffixed), else the
-    # repository's India/NSE-first convention (utils/sidebar.py, Page 5).
-    return ticker if _is_qualified(ticker) else f"{ticker}.NS"
 
 
 def _resolve_benchmark(label, custom=""):
@@ -465,7 +450,7 @@ def render_page():
     )
 
     # ── Resolve inputs ───────────────────────────────────────────────────────
-    ticker = _resolve_ticker(ticker_raw, exchange)
+    ticker = resolve_ticker(ticker_raw, exchange)
     benchmark_ticker, benchmark_warning = _resolve_benchmark(benchmark_label, custom_benchmark)
 
     if not ticker_raw or not ticker_raw.strip():

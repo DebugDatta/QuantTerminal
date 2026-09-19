@@ -241,10 +241,17 @@ def _chart_image(chart) -> object | None:
         return None
     try:
         from reportlab.platypus import Image
+        import tempfile
+        import os
 
         tmp = tempfile.mktemp(suffix=".png")
         writer(tmp)
-        return Image(tmp)
+        img = Image(tmp)
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        return img
     except Exception:
         return None
 

@@ -26,7 +26,14 @@ def fit_gmm(
     labels = model.predict(X)
     probs = model.predict_proba(X)
     means = model.means_.flatten()
-    covars = model.covariances_.flatten()
+    if covariance_type == "full":
+        covars = model.covariances_[:, 0, 0]
+    elif covariance_type == "tied":
+        covars = np.array([model.covariances_[0, 0]])
+    elif covariance_type == "diag":
+        covars = model.covariances_[:, 0]
+    else:
+        covars = model.covariances_
     weights = model.weights_
 
     order = np.argsort(means)

@@ -19,8 +19,7 @@ def backtest_metrics(
     cagr = (equity_curve.iloc[-1] / equity_curve.iloc[0]) ** (1 / max(n_years, 0.01)) - 1
     ann_vol = returns.std() * np.sqrt(TRADING_DAYS_PER_YEAR)
 
-    rf_period = risk_free_rate / TRADING_DAYS_PER_YEAR
-    excess = returns - rf_period
+    excess = returns - risk_free_rate
     sharpe = (excess.mean() / (excess.std() + 1e-10)) * np.sqrt(TRADING_DAYS_PER_YEAR)
 
     down_rets = returns[returns < 0]

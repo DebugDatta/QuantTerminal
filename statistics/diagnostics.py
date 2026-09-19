@@ -27,16 +27,12 @@ import pandas as pd
 from scipy import stats
 from statsmodels.stats.diagnostic import acorr_ljungbox
 
+from statistics._common import clean_series
+
 _IS_NORMAL_PASS = "Normal at 5% level"
 _IS_NORMAL_FAIL = "Not normal at 5% level"
 _IS_AC_PASS = "No significant autocorrelation at 5% level"
 _IS_AC_FAIL = "Significant autocorrelation at 5% level"
-
-
-def _clean_series(returns: pd.Series) -> pd.Series:
-    if not isinstance(returns, pd.Series):
-        raise TypeError("returns must be a pandas Series")
-    return returns.dropna()
 
 
 def ljung_box(returns: pd.Series, lags: int = 10) -> dict:
@@ -62,7 +58,7 @@ def ljung_box(returns: pd.Series, lags: int = 10) -> dict:
       the library choice is an inference (no package specified in docs).
     - NaNs are dropped before testing (docs are silent; module convention).
     """
-    data = _clean_series(returns)
+    data = clean_series(returns)
     if isinstance(lags, bool) or not isinstance(lags, int) or lags <= 0:
         raise ValueError("lags must be a positive integer")
 
@@ -97,7 +93,7 @@ def jarque_bera(returns: pd.Series) -> dict:
       an inference (no package specified in docs).
     - NaNs are dropped before testing (docs are silent; module convention).
     """
-    data = _clean_series(returns)
+    data = clean_series(returns)
     statistic, p_value = stats.jarque_bera(data)
     is_normal = bool(p_value >= 0.05)
     return {
@@ -127,7 +123,7 @@ def shapiro_wilk(returns: pd.Series) -> dict:
       minimum.
     - NaNs are dropped before testing (docs are silent; module convention).
     """
-    data = _clean_series(returns)
+    data = clean_series(returns)
     if not 3 <= len(data) <= 5000:
         raise ValueError(
             "shapiro_wilk requires between 3 and 5000 observations "

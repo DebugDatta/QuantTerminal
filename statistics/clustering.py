@@ -56,9 +56,13 @@ from scipy.cluster.hierarchy import fcluster, leaves_list, linkage
 from sklearn.cluster import KMeans
 
 from statistics.pca import pca_decomposition
+from statistics._common import (
+    clean_frame,
+    validate_multi_asset,
+    MIN_ASSETS,
+    MIN_COMPLETE_OBSERVATIONS,
+)
 
-MIN_ASSETS = 2
-MIN_COMPLETE_OBSERVATIONS = 3
 DEFAULT_N_CLUSTERS = 3
 MIN_CLUSTERS = 2
 MAX_CLUSTERS = 10
@@ -66,23 +70,8 @@ RANDOM_STATE = 0
 N_INIT = 1
 
 
-def _clean_frame(returns: pd.DataFrame) -> pd.DataFrame:
-    if not isinstance(returns, pd.DataFrame):
-        raise TypeError("returns must be a pandas DataFrame")
-    return returns.dropna(axis=0, how="any")
-
-
 def _validate(clean: pd.DataFrame, n_clusters: int) -> None:
-    if clean.shape[1] < MIN_ASSETS:
-        raise ValueError(
-            "clustering requires at least 2 asset columns; "
-            f"got {clean.shape[1]}"
-        )
-    if clean.shape[0] < MIN_COMPLETE_OBSERVATIONS:
-        raise ValueError(
-            "clustering requires at least 3 complete observations; "
-            f"got {clean.shape[0]}"
-        )
+    validate_multi_asset(clean, MIN_ASSETS, MIN_COMPLETE_OBSERVATIONS, "clustering")
     if isinstance(n_clusters, bool) or not isinstance(
         n_clusters, (int, np.integer)
     ):
@@ -158,7 +147,7 @@ def kmeans_clustering(returns: pd.DataFrame, n_clusters: int = 3) -> dict:
     - No silhouette / inertia / elbow diagnostics and no plot objects are
       returned (not documented).
     """
-    clean = _clean_frame(returns)
+    clean = clean_frame(returns)
     _validate(clean, n_clusters)
     k = int(n_clusters)
     n_assets = int(clean.shape[1])
@@ -222,7 +211,7 @@ def hierarchical_data(returns: pd.DataFrame, n_clusters: int = 3) -> dict:
     - No figure is returned; dendrogram construction belongs to
       plots/clustering.py (ARCHITECTURE.md split).
     """
-    clean = _clean_frame(returns)
+    clean = clean_frame(returns)
     _validate(clean, n_clusters)
     k = int(n_clusters)
     n_assets = int(clean.shape[1])

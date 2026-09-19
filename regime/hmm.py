@@ -30,10 +30,17 @@ def fit_hmm(
     probs = model.predict_proba(X)
 
     means = model.means_.flatten()
-    covars = model.covars_.flatten()
+    if covariance_type == "full":
+        covars = model.covars_[:, 0, 0]
+    elif covariance_type == "tied":
+        covars = np.array([model.covars_[0, 0]])
+    elif covariance_type == "diag":
+        covars = model.covars_[:, 0]
+    else:
+        covars = model.covars_
     trans_mat = model.transmat_
 
-    state_vol = np.array([np.sqrt(c) for c in covars])
+    state_vol = np.sqrt(covars)
     order = np.argsort(means)
     regime_map = {old: new for new, old in enumerate(order)}
     states = np.array([regime_map[s] for s in states])

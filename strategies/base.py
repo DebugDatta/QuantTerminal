@@ -8,7 +8,10 @@ class Strategy(ABC):
     """Base class for trading strategies."""
 
     name: str = "Base"
-    params: dict = {}
+    _default_params: dict = {}
+
+    def __init__(self):
+        self.params = self._default_params.copy()
 
     @abstractmethod
     def generate_signals(self, df: pd.DataFrame) -> pd.Series:
@@ -19,4 +22,4 @@ class Strategy(ABC):
         pass
 
     def get_param_defaults(self) -> dict:
-        return self.params.copy()
+        return self._default_params.copy()
