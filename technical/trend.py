@@ -1,7 +1,5 @@
 """Trend indicators. Spec: docs/TECHNICAL_INDICATORS.md section 1 & 7."""
 
-from typing import Optional
-
 import numpy as np
 import pandas as pd
 
