@@ -1,7 +1,6 @@
 """Formatting helpers. Spec: docs/ARCHITECTURE.md -> utils/helpers.py."""
 
-from datetime import date, datetime
-from typing import Optional
+from datetime import date
 
 import pandas as pd
 
