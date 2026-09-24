@@ -44,7 +44,6 @@ numba>=0.58.0
 joblib>=1.3.0
 
 # Deep Learning & Recurrent Neural Networks
-torch>=2.0.0
 tensorflow>=2.15.0
 keras>=3.0.0
 
