@@ -95,21 +95,155 @@ def inject_custom_theme():
         background: rgba(0, 230, 118, 0.1) !important;
     }
 
-    /* Table / Dataframe Styling */
-    div[data-testid="stTable"], div[data-testid="stDataFrame"] {
-        border-radius: 12px;
-        overflow: hidden;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        background: rgba(15, 23, 42, 0.6);
-        backdrop-filter: blur(8px);
+    /* ========================================================= */
+    /* Table / Dataframe Institutional Color-Shaded Styling      */
+    /* ========================================================= */
+    div[data-testid="stTable"], 
+    div[data-testid="stDataFrame"],
+    .stDataFrame {
+        border-radius: 12px !important;
+        overflow: hidden !important;
+        border: 1px solid rgba(56, 189, 248, 0.25) !important;
+        background: linear-gradient(180deg, rgba(15, 23, 42, 0.90) 0%, rgba(11, 15, 25, 0.96) 100%) !important;
+        box-shadow: 0 10px 28px -4px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+        backdrop-filter: blur(12px) !important;
+        margin-bottom: 1rem !important;
+        transition: border-color 0.25s ease, box-shadow 0.25s ease !important;
+
+        /* Streamlit Glide Data Grid Theme Variables */
+        --gdg-bg-header: #1E293B;
+        --gdg-bg-header-has-focus: #25354F;
+        --gdg-bg-header-hovered: #2A3C59;
+        --gdg-text-header: #38BDF8;
+        --gdg-text-header-selected: #00E676;
+        --gdg-bg-cell: #0F172A;
+        --gdg-bg-cell-medium: #162238;
+        --gdg-text-dark: #F8FAFC;
+        --gdg-text-medium: #CBD5E1;
+        --gdg-text-light: #94A3B8;
+        --gdg-accent-color: #2563EB;
+        --gdg-accent-light: rgba(37, 99, 235, 0.2);
+        --gdg-border-color: rgba(255, 255, 255, 0.08);
+        --gdg-horizontal-border-color: rgba(255, 255, 255, 0.06);
     }
-    table {
-        color: #E2E8F0 !important;
+
+    div[data-testid="stDataFrame"]:hover {
+        border-color: rgba(56, 189, 248, 0.45) !important;
+        box-shadow: 0 14px 34px -4px rgba(0, 0, 0, 0.6), 0 0 18px rgba(56, 189, 248, 0.15) !important;
     }
-    th {
-        background-color: #1E293B !important;
+
+    /* Modern Streamlit Glide Data Grid Container & Toolbar */
+    [data-testid="stDataFrame"] > div {
+        background: transparent !important;
+    }
+
+    div[data-testid="stDataFrameToolbar"] {
+        background: rgba(15, 23, 42, 0.95) !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+        border-radius: 12px 12px 0 0 !important;
+        padding: 4px 8px !important;
+    }
+
+    div[data-testid="stDataFrameToolbar"] button {
+        color: #94A3B8 !important;
+        background: rgba(255, 255, 255, 0.04) !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        border-radius: 6px !important;
+        transition: all 0.2s ease !important;
+    }
+
+    div[data-testid="stDataFrameToolbar"] button:hover {
         color: #38BDF8 !important;
-        font-weight: 600 !important;
+        background: rgba(56, 189, 248, 0.15) !important;
+        border-color: rgba(56, 189, 248, 0.4) !important;
+    }
+
+    /* HTML Tables & Pandas Styler Formatted Tables */
+    table {
+        width: 100% !important;
+        border-collapse: separate !important;
+        border-spacing: 0 !important;
+        color: #F1F5F9 !important;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+        font-size: 0.86rem !important;
+    }
+
+    table thead th,
+    .dataframe thead th,
+    th {
+        background: linear-gradient(180deg, #1E293B 0%, #152236 100%) !important;
+        color: #38BDF8 !important;
+        font-family: 'JetBrains Mono', monospace !important;
+        font-size: 0.78rem !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.06em !important;
+        text-transform: uppercase !important;
+        padding: 12px 16px !important;
+        border-top: none !important;
+        border-bottom: 2px solid rgba(56, 189, 248, 0.4) !important;
+        border-left: none !important;
+        border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
+        white-space: nowrap !important;
+    }
+
+    table thead th:last-child,
+    th:last-child {
+        border-right: none !important;
+    }
+
+    table tbody td,
+    .dataframe tbody td,
+    td {
+        padding: 10px 16px !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+        border-right: 1px solid rgba(255, 255, 255, 0.04) !important;
+        color: #E2E8F0 !important;
+        font-size: 0.85rem !important;
+        font-variant-numeric: tabular-nums !important;
+        transition: background-color 0.15s ease, color 0.15s ease !important;
+    }
+
+    table tbody td:last-child,
+    td:last-child {
+        border-right: none !important;
+    }
+
+    /* Alternating Row Zebra Shading (Obsidian vs Sapphire Slate) */
+    table tbody tr:nth-child(odd),
+    .dataframe tbody tr:nth-child(odd) {
+        background-color: rgba(15, 23, 42, 0.65) !important;
+    }
+
+    table tbody tr:nth-child(even),
+    .dataframe tbody tr:nth-child(even) {
+        background-color: rgba(26, 38, 59, 0.45) !important;
+    }
+
+    /* Interactive Row Hover with Cyan Accent Glow */
+    table tbody tr:hover,
+    .dataframe tbody tr:hover {
+        background-color: rgba(56, 189, 248, 0.12) !important;
+    }
+
+    table tbody tr:hover td,
+    .dataframe tbody tr:hover td {
+        color: #FFFFFF !important;
+    }
+
+    /* Custom Dataframe Scrollbar */
+    div[data-testid="stDataFrame"] ::-webkit-scrollbar {
+        width: 6px !important;
+        height: 6px !important;
+    }
+    div[data-testid="stDataFrame"] ::-webkit-scrollbar-track {
+        background: rgba(11, 15, 25, 0.6) !important;
+    }
+    div[data-testid="stDataFrame"] ::-webkit-scrollbar-thumb {
+        background: rgba(56, 189, 248, 0.25) !important;
+        border-radius: 4px !important;
+    }
+    div[data-testid="stDataFrame"] ::-webkit-scrollbar-thumb:hover {
+        background: rgba(56, 189, 248, 0.5) !important;
     }
 
     /* Expanders Styling */

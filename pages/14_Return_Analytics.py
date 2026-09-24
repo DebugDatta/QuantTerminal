@@ -254,11 +254,6 @@ def inject_return_terminal_theme():
             border: 1px solid rgba(56, 189, 248, 0.2);
         }
 
-        /* Dataframe styling */
-        div[data-testid="stDataFrame"] {
-            border: 1px solid #1E293B;
-            border-radius: 6px;
-        }
         </style>
         """,
         unsafe_allow_html=True,
