@@ -6,9 +6,20 @@ institutional-grade command center across all analytical domains, models,
 simulations, backtesting engines, and research reporting workflows.
 """
 
-from datetime import datetime
 import os
 import sys
+
+# Prevent worker thread explosion on shared cloud containers (Streamlit Community Cloud)
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("TF_NUM_INTRAOP_THREADS", "1")
+os.environ.setdefault("TF_NUM_INTEROP_THREADS", "1")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+os.environ.setdefault("VECLIB_MAXIMUM_THREADS", "1")
+os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
+
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 import pandas as pd
 import streamlit as st
