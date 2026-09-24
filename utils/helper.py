@@ -257,7 +257,7 @@ def drop_holiday_nans(df):
 
 @st.cache_data(show_spinner=False)
 def load_data(ticker, period="1y", interval="1d"):
-    """Load stock data from yfinance for given period and interval."""
+    """Load stock data from yfinance for given period and interval with resilient fallback."""
     try:
         df = yf.download(
             ticker,
@@ -266,6 +266,19 @@ def load_data(ticker, period="1y", interval="1d"):
             auto_adjust=True,
             progress=False
         )
+        # If requested 5y failed due to Yahoo Finance period=5y glitch on .NS tickers, fallback to max sliced to 5y
+        if (df is None or df.empty) and period in ("5y", "5Y"):
+            df_max = yf.download(ticker, period="max", interval=interval, auto_adjust=True, progress=False)
+            if df_max is not None and not df_max.empty:
+                df = df_max.tail(1260)
+        # If still empty, try without auto_adjust
+        if df is None or df.empty:
+            df = yf.download(ticker, period=period, interval=interval, auto_adjust=False, progress=False)
+            if (df is None or df.empty) and period in ("5y", "5Y"):
+                df_max = yf.download(ticker, period="max", interval=interval, auto_adjust=False, progress=False)
+                if df_max is not None and not df_max.empty:
+                    df = df_max.tail(1260)
+
         if df is None or df.empty:
             return pd.DataFrame()
         if isinstance(df.columns, pd.MultiIndex):

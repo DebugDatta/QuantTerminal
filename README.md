@@ -1,148 +1,240 @@
-# QuantTerminal 📈
+# QuantTerminal 📊
 
-An institutional-grade quantitative finance research platform, econometric forecasting laboratory, and Deep Reinforcement Learning trading system for **Indian (NSE/BSE) and US Equity Markets**. Built with **Python + Streamlit**, powered by point-in-time daily OHLCV data with strict **zero look-ahead bias** protocols.
+[![Python 3.10 | 3.11 | 3.12](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue.svg)](https://www.python.org/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.63-FF4B4B.svg)](https://streamlit.io/)
+[![ReportLab](https://img.shields.io/badge/PDF_Engine-ReportLab-00E676.svg)](https://www.reportlab.com/)
+[![Markets](https://img.shields.io/badge/Markets-NSE%20%7C%20BSE%20%7C%20US%20(NYSE%2FNASDAQ)-38BDF8.svg)](https://finance.yahoo.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+An institutional-grade quantitative finance research platform, econometric forecasting laboratory, stochastic risk simulation engine, and publication-ready research report generator for **Indian (NSE/BSE) and US Equity Markets**.
+
+Built with **Python + Streamlit**, powered by point-in-time daily OHLCV data with strict **zero look-ahead bias** and **zero synthetic metric fabrication** protocols.
 
 ---
 
-## 🏛️ Architecture Overview
+## 🏛️ System Architecture
 
-QuantTerminal provides an integrated quantitative research workbench spanning statistical regime modeling, stochastic risk simulations, algorithmic tournaments, econometric time series models, gradient-boosted decision trees, sequential deep learning, and continuous-action Deep RL trading.
+QuantTerminal provides an integrated command center bridging quantitative research, econometric modeling, stochastic simulations, algorithmic tournaments, and institutional reporting.
 
 ```
 QuantTerminal/
-├── app.py                              # Main Stock Terminal entrypoint
+├── app.py                              # Quantitative Research Command Center & Overview
+├── core/
+│   ├── metrics.py                      # Sharpe, Sortino, Calmar, Information Ratio & Drawdowns
+│   └── returns.py                      # Continuous logarithmic & arithmetic return transforms
 ├── pages/
-│   ├── 01_Regime_Detection.py          # Module 1: Gaussian Hidden Markov Models
-│   ├── 02_Monte_Carlo_Simulations.py   # Module 2: Cholesky & GBM Risk Envelopes
-│   ├── 03_Strategy_Lab.py              # Module 3: 11-Strategy Tournament & 2D Heatmaps
-│   ├── 04_Backtesting.py               # Module 4: Trade Resampling & Deflated Sharpe
-│   ├── 05_Time_Series_Forecasting.py   # Module 5: Econometric Studio, Bates-Granger, GARCH
-│   ├── 06_ML_Forecasting.py            # Module 6: Tree Ensembles, 360° Radar, Macro Sandbox
-│   ├── 07_DL_Forecasting.py            # Module 7: Sequential GRU/LSTM & Receptive Tensors
-│   └── 08_RL_Trading.py                # Module 8: TensorTrade OMS, Continuous SAC & PPO
+│   ├── 01_Regime_Detection.py          # Module 01: Gaussian Hidden Markov Models (HMM)
+│   ├── 02_Monte_Carlo_Simulations.py   # Module 02: Stochastic GBM, Jump Diffusion & Fan Charts
+│   ├── 04_Backtesting.py               # Module 04: Vectorized Backtester & Execution Frictions
+│   ├── 05_Time_Series_Forecasting.py   # Module 05: Econometric Studio, ARIMA/SARIMA & Decomp
+│   ├── 06_ML_Forecasting.py            # Module 06: Tree Ensembles, Regressors & OOS Validation
+│   ├── 07_DL_Forecasting.py            # Module 07: Sequential LSTM & GRU Recurrent Dashboards
+│   ├── 08_RL_Trading.py                # Module 08: Gymnasium & TensorTrade Deep RL OMS
+│   ├── 09_dashboard.py                 # Module 09: Institutional Equity Research Dashboard
+│   ├── 10_market_explorer.py           # Module 10: Market Explorer & Multi-Cap Screener
+│   ├── 11_strategy_lab.py              # Module 11: 11-Strategy Tournament & 2D Grid Optimization
+│   ├── 12_technical_analysis.py        # Module 12: Algorithmic Oscillators, Bands & Trend Overlays
+│   ├── 13_portfolio_lab.py             # Module 13: Markowitz Efficient Frontier & Risk Parity
+│   ├── 14_Return_Analytics.py          # Module 14: Log Return Heatmaps & Cumulative Trajectories
+│   ├── 15_Statistical_Analysis.py      # Module 15: Empirical Moments, Normality & Correlation
+│   ├── 16_Volatility_Lab.py            # Module 16: Parkinson/Yang-Zhang & GARCH(1,1) Vol Cones
+│   ├── 17_reports.py                   # Module 17: 20-Page Institutional PDF Report Center
+│   ├── 18_Risk_Analytics.py            # Module 18: Historical/Parametric VaR & Drawdown Depth
+│   ├── 19_Factor_Research.py           # Module 19: Market Beta, Jensen's Alpha & Style Regressions
+│   └── 20_Statistical_Arbitrage.py     # Module 20: Engle-Granger Cointegration & Pairs Trading
+├── reporting/
+│   ├── pdf_generator.py                # 20-Page ReportLab Flowable Canvas Document Engine
+│   ├── report_charts.py                # High-DPI Multi-Panel Institutional Charts & Diagrams
+│   ├── report_data.py                  # Cross-Module Quantitative Data Aggregator & Validator
+│   └── report_styles.py                # Institutional Palette, Grid Budget & Typography Tokens
 ├── utils/
-│   ├── helper.py                       # Market data loaders, styling, metrics & sanitization
-│   └── sidebar.py                      # Unified sidebar selector & exchange resolution
-├── ml_dl/
-│   ├── src/                            # Feature engineering, model architectures & universes
-│   └── models/                         # Pre-trained model weights (.cbm, .txt, .pt)
-├── scripts/
-│   └── generate_quantterminal_pdf.py   # Institutional technical PDF generator
-├── QuantTerminal_System_Documentation.pdf # 11-page publication-grade PDF documentation
-└── requirements.txt                    # Production dependencies
+│   ├── helper.py                       # Market data loaders, dark theme CSS & formatters
+│   └── sidebar.py                      # Unified persistent exchange & asset selector
+├── tests/
+│   ├── test_metrics.py                 # Core risk and performance metric assertions
+│   ├── test_pdf.py                     # ReportLab export and section rendering tests
+│   └── test_reporting_pipeline.py      # 20-page full-canvas integration test suite
+├── .streamlit/
+│   └── config.toml                     # Production deployment server & dark theme configuration
+├── requirements.txt                    # Production dependencies
+└── README.md                           # Platform documentation
 ```
 
 ---
 
-## 📊 Core Modules & Capabilities
+## 🧭 Analytical Domains & Workspaces
 
-### 1. Market Regime Detection (`pages/01_Regime_Detection.py`)
-- **Gaussian Hidden Markov Models (HMM)**: Discrete regime discovery from continuous log-returns and normalized volatility.
-- **Baum-Welch EM Calibration & Viterbi Decoding**: Maximizes historical likelihood and decodes optimal hidden state sequences.
-- **3-Regime Taxonomy**: Low-Volatility Bull Trend, High-Volatility Bear/Selloff, and Range-Bound Mean Reversion.
-- **Regime Transition Matrices**: Calculates expected regime duration ($E[D_i] = \frac{1}{1 - a_{ii}}$) and regime-conditioned volatility.
+The platform is structured into **7 core research domains** encompassing **18 specialized quantitative workspaces**:
 
-### 2. Monte Carlo Risk Simulations (`pages/02_Monte_Carlo_Simulations.py`)
-- **Geometric Brownian Motion (GBM)**: Stochastic simulation using exact Itô discrete formulation: $S_{t+\Delta t} = S_t \exp\left((\mu - \frac{1}{2}\sigma^2)\Delta t + \sigma \sqrt{\Delta t} Z\right)$.
-- **Multivariate Cholesky Decomposition**: Correlated multi-asset portfolio simulations ($L L^T = \Sigma$).
-- **Tail Risk Envelopes**: Value-at-Risk (VaR 95%, 99%), Conditional VaR (CVaR / Expected Shortfall), and percentile fan charts (5th, 25th, 50th, 75th, 95th).
+### 1. Market & Data
+- **Market Explorer (`pages/10_market_explorer.py`)**: Interactive OHLCV candlestick and volume charting, multi-cap universe screener (Large, Mid, Small, Micro), sector breakdowns, and multi-exchange feeds.
+- **Technical Analysis (`pages/12_technical_analysis.py`)**: Algorithmic indicator suite featuring Bollinger Bands, RSI, MACD, Stochastic momentum, Average True Range (ATR), and moving average ribbons.
+- **Dashboard (`pages/09_dashboard.py`)**: Consolidated multi-timeframe equity research monitor with valuation multiples, trading volume anomalies, and cross-asset context.
 
-### 3. Strategy Lab & Research (`pages/03_Strategy_Lab.py`)
-- **11-Strategy Tournament Leaderboard**: Simultaneous evaluation of Buy & Hold, SMA Crossover, EMA Filter, Stateful RSI, MACD, Bollinger Bands, Donchian Breakout, Momentum, Mean Reversion Z-Score, Volatility Breakout, and Pair Trading.
-- **2D Parameter Grid Optimization**: Surface heatmaps mapping Sharpe variations across parameter neighborhoods.
-- **Walk-Forward Overfitting Validator**: Chronological 70% In-Sample / 30% Out-of-Sample degradation ratio ($\text{Sharpe}_{\text{OOS}} / \text{Sharpe}_{\text{IS}}$) with automated risk grading (`ROBUST ALPHA`, `MODERATE ALPHA DECAY`, `HIGH OVERFITTING RISK`).
-- **Deep Rolling Risk Analytics**: Rolling 126-day Sharpe, Calmar ratio, and mathematical trade expectancy.
+### 2. Statistics & Returns
+- **Return Analytics (`pages/14_Return_Analytics.py`)**: Discrete vs. continuous logarithmic return transformations, cumulative compounding wealth indices, calendar return heatmaps, and rolling performance profiles.
+- **Statistical Analysis (`pages/15_Statistical_Analysis.py`)**: Empirical higher-order moments (Skewness, Excess Kurtosis), Jarque-Bera and Shapiro-Wilk normality testing, empirical KDE vs. Gaussian distribution overlays, and cross-asset correlation matrices.
+- **Volatility Lab (`pages/16_Volatility_Lab.py`)**: Realized volatility estimators (Close-to-Close, Parkinson, Garman-Klass, Rogers-Satchell, Yang-Zhang), GARCH(1,1) & EGARCH conditional volatility modeling, and historical volatility cones.
 
-### 4. Backtesting Engine & Risk Overlays (`pages/04_Backtesting.py`)
-- **Realistic Execution Simulator**: Dynamic transaction costs and liquidity slippage (bps) with configurable rebalancing intervals.
-- **Dynamic Risk Overlays**: Fixed Stop-Loss (%), Trailing Stop-Loss (%), and Take-Profit Targets (%).
-- **Monte Carlo Trade Sequence Resampling**: 1,000 randomized trade permutations quantifying worst-case drawdown distributions.
-- **Factor Attribution & Deflated Sharpe (DSR)**: Bailey & López de Prado's DSR adjusting for trial multiplicity, skewness, and kurtosis alongside market $\alpha$, $\beta$, and Up/Down capture ratios.
+### 3. Forecasting
+- **Time Series Forecasting (`pages/05_Time_Series_Forecasting.py`)**: Classical and auto-fit ARIMA/SARIMA specifications, multi-step horizon projection cones with 95% confidence intervals, STL decomposition, and information criteria optimization (AIC/BIC).
+- **ML Forecasting (`pages/06_ML_Forecasting.py`)**: Supervised machine learning regressors (Ridge, Lasso, Random Forest, Gradient Boosting, XGBoost), chronological 80/20 train/test splits, feature importance rankings, and out-of-sample directional accuracy scoring.
+- **DL Forecasting (`pages/07_DL_Forecasting.py`)**: Deep recurrent neural network sequence architectures (LSTM, GRU) modeling multi-step temporal dependencies.
 
-### 5. Time Series Econometric Studio (`pages/05_Time_Series_Forecasting.py`)
-- **8 Econometric Models**: Auto-ARIMA, Classical ARIMA($p, d, q$), SARIMA($p, d, q$)($P, D, Q$)$_s$, Holt-Winters Triple Exponential, Holt's Linear, Theta Model (M3 Winner), Naive Drift Martingale Benchmark, and Bates-Granger Optimal Ensemble.
-- **Bates-Granger (1969) Optimal Stacking**: Inverse-variance weighted combination minimizing out-of-sample forecast variance.
-- **GARCH(1,1) Volatility Clustering**: Maximum likelihood estimation of conditional variance $\sigma_t^2 = \omega + \alpha \epsilon_{t-1}^2 + \beta \sigma_{t-1}^2$, volatility shock half-life, and dynamic VaR corridors.
-- **Spectral Cycles & Changepoint Detection**: Fast Fourier Transform (FFT) harmonic cycle discovery and Ruptures structural break detection.
-- **Residual Diagnostics**: Automated Ljung-Box white noise tests, Jarque-Bera normality tests, and ACF correlograms.
+### 4. Simulation & Risk
+- **Monte Carlo Simulations (`pages/02_Monte_Carlo_Simulations.py`)**: Geometric Brownian Motion (GBM), Merton Jump Diffusion, and bootstrap resampling. Generates 500+ path quantile fan charts (5th to 95th percentiles) and terminal price loss probability CDFs.
+- **Risk Analytics (`pages/18_Risk_Analytics.py`)**: Historical, Parametric, and Cornish-Fisher Value-at-Risk (VaR 95%, 99%), Conditional VaR (Expected Shortfall), underwater drawdown duration analytics, and stress testing.
+- **Regime Detection (`pages/01_Regime_Detection.py`)**: Gaussian Hidden Markov Models (HMM) for unsupervised market state discovery, transition probability matrices, and regime-conditioned return dynamics.
 
-### 6. Machine Learning Forecasting (`pages/06_ML_Forecasting.py`)
-- **Tree-based Ensemble Architectures**: CatBoost (Ordered Boosting), LightGBM (GOSS + EFB), XGBoost (L1/L2 Regularization), and Random Forest.
-- **31 Scale-Free Factor Pipeline**: 7 factor families (Macro Benchmark, Volatility, Momentum, Trend Distance, Oscillators, Geometry, Volume Dynamics).
-- **5-View Institutional Metric Visualizer**: Ranked scorecard, 360° multi-metric radar profile, Pareto efficiency frontier, model $\times$ metric heatmap matrix, and partition generalization drift.
-- **Consensus Conviction Gauge & Macro Sandbox**: Real-time 0–100 conviction gauge, epistemic dispersion corridor ($\pm 1\sigma$), and counterfactual macro shock stress testing.
+### 5. Strategy & Trading
+- **Strategy Lab (`pages/11_strategy_lab.py`)**: Algorithmic strategy development workstation with 11 pre-built models, composite logic combiner (AND/OR/Majority), tournament leaderboard, and 2D hyperparameter optimization heatmaps.
+- **Backtesting (`pages/04_Backtesting.py`)**: Vectorized execution engine incorporating execution friction modeling (brokerage commission and liquidity slippage), trade execution logs, and tearsheet metrics (Sharpe, Sortino, Calmar).
+- **RL Trading (`pages/08_RL_Trading.py`)**: Reinforcement learning trading agent environment built on Gymnasium with continuous and discrete action spaces.
 
-### 7. Deep Learning Sequential Forecasting (`pages/07_DL_Forecasting.py`)
-- **Sequential Neural Backbones**: Gated Recurrent Units (GRU), Long Short-Term Memory (LSTM), Bidirectional LSTM (BiLSTM), and SimpleRNN.
-- **Tensor Receptive Field**: Sequential $(B, 60, 31)$ historical tensor mapping 60 trading sessions into multi-step forward returns.
-- **Custom Financial Losses**: Directional Penalty Loss (penalizing sign prediction mismatches) and Differentiable Negative Sharpe Loss.
-- **Epistemic Uncertainty Corridor**: Shaded $\pm 1\sigma$ and $\pm 2\sigma$ dispersion bands around the consensus forward trajectory.
+### 6. Portfolio & Research
+- **Portfolio Lab (`pages/13_portfolio_lab.py`)**: Modern Portfolio Theory (MPT), Markowitz efficient frontier optimization, Maximum Sharpe, Minimum Volatility, Equal Risk Contribution (ERC), and Black-Litterman allocation.
+- **Factor Research (`pages/19_Factor_Research.py`)**: Systematic multi-factor regressions, CAPM Market Beta, Jensen's Alpha, rolling factor dynamics, and benchmark variance attribution ($R^2$).
+- **Statistical Arbitrage (`pages/20_Statistical_Arbitrage.py`)**: Pairs trading workstation with Engle-Granger two-step cointegration testing, spread z-score dynamics, and Ornstein-Uhlenbeck mean-reversion half-life estimation.
 
-### 8. Deep Reinforcement Learning Trading (`pages/08_RL_Trading.py`)
-- **TensorTrade OMS Integration**: Multi-stream financial `DataFeed`, dual-wallet portfolio (`INR`/`USD` + Stock), and realistic simulated broker.
-- **Algorithmic RL Engines**:
-  - **Soft Actor-Critic (SAC)**: Maximum entropy continuous equity allocation $w_t \in [0.0, 1.0]$, Twin Q-critics ($Q_1, Q_2$), Polyak target updates, and automatic dual temperature ($\alpha$) tuning.
-  - **Continuous Action PPO**: Generalized Advantage Estimation (GAE-$\lambda$) with clipped surrogate objective $\mathcal{L}^{\text{CLIP}}(\theta)$.
-  - **Deep Recurrent Q-Networks (DRQN)**: Recurrent cell hidden state $h_t$ resolving Partial Observability (POMDP) across market regimes.
-  - **Deep Q-Networks (DQN)**: Discrete baseline with experience replay and target network synchronization.
-- **2D Decision Surfaces**: Continuous portfolio target allocation surface and Twin Critic epistemic disagreement surface ($|Q_1 - Q_2|$).
-- **B15 Institutional Risk Guardrails**: Emergency Kill-Switch (immediate 100% cash liquidation) and Maximum Drawdown Circuit Breakers.
+### 7. Research Reporting
+- **Report Generation Center (`pages/17_reports.py`)**: Consolidated 20-page institutional research PDF document generator compiling multi-panel vector charts, metric tables, and compliance disclaimers from live session data.
+
+---
+
+## 📑 20-Page Institutional PDF Report Engine
+
+QuantTerminal features a high-density ReportLab PDF generator (`reporting/pdf_generator.py`) designed to institutional publishing standards:
+
+- **Strict Page Budget**: Exactly **20 pages** with calibrated vertical height budgeting (85–95% usable canvas fill).
+- **Native Typography**: TrueType `DejaVu Sans` rendering native Indian Rupee (`₹`) and USD (`$`) symbols with zero replacement boxes (`■`).
+- **Data Integrity**: Direct ingestion of live OHLCV data. No synthetic numbers or invented statistics are fabricated for unexecuted modules; formal architectural flowcharts and constraint matrices are rendered instead.
+- **Multi-Panel Visualizations**:
+  - Empirical distribution histogram/KDE with Normal Q-Q plot
+  - Rolling volatility estimators & 5-estimator bar charts
+  - Underwater drawdown & tail-loss quantile distributions
+  - Multi-step ARIMA forecast cone with expanding 95% confidence bounds
+  - Out-of-sample machine learning test metrics ($R^2$, RMSE)
+  - 500-path Monte Carlo stochastic fan chart with terminal loss CDF
+  - Factor Beta sensitivity and statistical arbitrage cointegration framework
 
 ---
 
 ## 🌐 Market Coverage & Currency Mechanics
 
-QuantTerminal provides native dual-market coverage with localized currency formatting and exchange mechanics:
+QuantTerminal natively supports multi-market quantitative analysis with automatic currency and trading calendar resolution:
 
-| Region | Exchange | Ticker Suffix | Currency | Market Cap Thresholds |
+| Region | Exchanges | Ticker Suffix | Currency | Market Cap Classifications |
 | :--- | :--- | :--- | :--- | :--- |
-| **India** | National Stock Exchange (NSE) | `.NS` | `INR` (`Rs.`) | Large Cap: >Rs. 75,000 Cr • Mid Cap: Rs. 20,000–75,000 Cr |
-| **India** | Bombay Stock Exchange (BSE) | `.BO` | `INR` (`Rs.`) | Small Cap: Rs. 1,000–20,000 Cr • Micro Cap: <Rs. 1,000 Cr |
-| **US** | NASDAQ / NYSE | None | `USD` (`$`) | Large Cap: >$10B • Mid Cap: $2B–$10B • Small Cap: <$2B |
+| **India** | NSE, BSE | `.NS`, `.BO` | `INR` (`₹`) | Large Cap (>₹75k Cr) • Mid Cap (₹20k–75k Cr) • Small Cap (₹1k–20k Cr) • Micro Cap (<₹1k Cr) |
+| **US** | NASDAQ, NYSE | None | `USD` (`$`) | Large Cap (>$10B) • Mid Cap ($2B–$10B) • Small Cap (<$2B) |
 
-Non-trading day filtering (`drop_holiday_nans()`) purges placeholder rows on market holidays (e.g., Diwali, Republic Day, Good Friday) to eliminate zero-return autocorrelation artifacts.
+The automated hygiene pipeline (`drop_holiday_nans()`) purges non-trading calendar gaps (Diwali, Republic Day, Good Friday, Thanksgiving, etc.) to eliminate spurious zero-return autocorrelation artifacts.
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start & Local Setup
 
-### 1. Clone & Set Up Environment
+### Prerequisites
+- Python 3.10, 3.11, or 3.12
+- `git`
+
+### 1. Clone & Set Up Virtual Environment
 
 ```bash
 git clone https://github.com/DebugDatta/QuantTerminal.git
 cd QuantTerminal
 
-# Create and activate virtual environment
+# Create virtual environment
 python3 -m venv .venv
-source .venv/bin/activate  # Linux/Mac
-# .venv\Scripts\activate   # Windows
 
-# Install production dependencies
+# Activate environment
+source .venv/bin/activate       # Linux / macOS
+# .venv\Scripts\activate        # Windows
+```
+
+### 2. Install Dependencies
+
+```bash
+pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### 2. Launch QuantTerminal
+### 3. Launch QuantTerminal
 
 ```bash
 streamlit run app.py
 ```
 
-Open your browser and navigate to `http://localhost:8501`.
+The application will start at `http://localhost:8501`.
 
 ---
 
-## 📑 Technical Documentation PDF
+## ☁️ Deployment Guide
 
-A publication-grade 11-page technical documentation PDF is provided directly in the repository:
+QuantTerminal is structured for zero-configuration containerized and cloud deployments:
 
-- 📄 **File**: [QuantTerminal_System_Documentation.pdf](file:///home/michaelfernandes/Desktop/Projects/QuantTerminal/QuantTerminal_System_Documentation.pdf)
-- **Rebuild PDF**: You can recompile the technical specification at any time using:
-  ```bash
-  python scripts/generate_quantterminal_pdf.py
-  ```
+### Streamlit Community Cloud
+1. Fork or push the repository to GitHub.
+2. In [Streamlit Cloud](https://share.streamlit.io/), create a new app pointing to your repository.
+3. Set the **Main file path** to `app.py`.
+4. Deploy. The `.streamlit/config.toml` file automatically ensures dark mode and headless operation.
+
+### Docker Deployment
+
+Create a `Dockerfile` in the project root:
+
+```dockerfile
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install system dependencies for fonts and graphics
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    fonts-dejavu-core \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+EXPOSE 8501
+
+HEALTHCHECK CMD curl --fail http://localhost:8501/_stcore/health || exit 1
+
+ENTRYPOINT ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+```
+
+Build and run:
+
+```bash
+docker build -t quantterminal:latest .
+docker run -p 8501:8501 quantterminal:latest
+```
 
 ---
 
-## 🛡️ License & Disclaimer
+## 🧪 Automated Testing & Verification
 
-QuantTerminal is designed exclusively for quantitative research, algorithmic prototyping, and academic portfolio management. Historical simulation results and machine learning forecasts do not constitute investment advice.
+Execute the test suite using `pytest`:
+
+```bash
+# Run all tests
+pytest
+
+# Test core risk and performance metrics
+pytest tests/test_metrics.py
+
+# Test 20-page PDF report generation pipeline
+pytest tests/test_reporting_pipeline.py
+```
+
+---
+
+## 🛡️ Governance & Disclaimer
+
+**Not Personalized Financial Advice • For Educational & Research Purposes Only**
+
+QuantTerminal is an algorithmic software framework designed for quantitative research, econometric modeling, statistical backtesting, and academic finance. All model outputs, probability distributions, forecasting cones, backtests, and research reports represent conditional historical estimations and do not constitute investment, tax, or financial advice.

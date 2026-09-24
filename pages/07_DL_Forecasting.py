@@ -91,7 +91,7 @@ def load_dl_cap_tier_metrics() -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner=False)
-def fetch_clean_stock_bars(ticker_str: str, period_str: str = "1y", interval_str: str = "1d") -> pd.DataFrame:
+def fetch_clean_stock_bars(ticker_str: str, period_str: str = "2y", interval_str: str = "1d") -> pd.DataFrame:
     """Fetch and standardize historical price data for sequential inference."""
     df_raw = load_data(ticker_str, period=period_str, interval=interval_str)
     df_clean = drop_holiday_nans(df_raw)
@@ -103,6 +103,29 @@ def fetch_clean_stock_bars(ticker_str: str, period_str: str = "1y", interval_str
     df_clean["Date"] = pd.to_datetime(df_clean["Date"]).dt.tz_localize(None)
     cols = [c for c in ["Date", "Open", "High", "Low", "Close", "Volume"] if c in df_clean.columns]
     return df_clean[cols].dropna(subset=["Close"]).sort_values("Date").reset_index(drop=True)
+
+
+def prepare_clean_seq_df(feat_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Prepares a clean, validated 60-bar sequential feature DataFrame for deep learning inference.
+    Gracefully handles rolling warm-up periods (e.g. 200-day SMA, 60-day vol) so assets with
+    moderate history can be evaluated without dropping all rows.
+    """
+    if feat_df.empty:
+        return pd.DataFrame()
+    df = feat_df.copy()
+    if "close_to_sma200" in df.columns:
+        if "close_to_sma50" in df.columns:
+            df["close_to_sma200"] = df["close_to_sma200"].fillna(df["close_to_sma50"])
+        df["close_to_sma200"] = df["close_to_sma200"].fillna(0.0)
+    if "vol_60" in df.columns:
+        if "vol_20" in df.columns:
+            df["vol_60"] = df["vol_60"].fillna(df["vol_20"])
+        df["vol_60"] = df["vol_60"].fillna(0.0)
+    for col in FEATURE_COLUMNS:
+        if col in df.columns:
+            df[col] = df[col].bfill().fillna(0.0)
+    return df.dropna(subset=FEATURE_COLUMNS).reset_index(drop=True)
 
 
 # Sequential DL Inference Engine
@@ -499,12 +522,15 @@ with tab_inference:
     st.subheader(f"🎯 Live Stock Sequential Forecast & Consensus: {company} ({ticker})")
     st.caption("Evaluates a 60-day sequential tensor across 31 scale-free features using recurrent gating architectures.")
 
+    infer_period = period if period in ["2y", "5y", "max"] else "2y"
     with st.spinner(f"Encoding 60-day historical sequence for {ticker}..."):
-        stock_bars = fetch_clean_stock_bars(ticker, period_str="1y", interval_str=interval)
-        nifty_bars = fetch_clean_stock_bars("^NSEI", period_str="1y", interval_str=interval)
+        stock_bars = fetch_clean_stock_bars(ticker, period_str=infer_period, interval_str=interval)
+        if len(stock_bars) < 60 and infer_period != "max":
+            stock_bars = fetch_clean_stock_bars(ticker, period_str="max", interval_str=interval)
+        nifty_bars = fetch_clean_stock_bars(benchmark_ticker, period_str=infer_period, interval_str=interval)
 
     if stock_bars.empty or len(stock_bars) < 60:
-        st.error(f"Insufficient price history for {ticker}. Need at least 60 trading bars for 3D sequence encoding.")
+        st.error(f"Insufficient price history for **{ticker}**. Found {len(stock_bars)} bars, but at least 60 daily bars are required for 3D sequence encoding.")
     else:
         feat_df = compute_single_stock_features(stock_bars.copy())
         if not nifty_bars.empty:
@@ -515,7 +541,7 @@ with tab_inference:
             for col in ["nifty_return_1d", "nifty_return_5d", "nifty_return_20d", "nifty_vol_20", "stock_vs_nifty_return_5d"]:
                 feat_df[col] = 0.0
 
-        clean_seq_df = feat_df.dropna(subset=FEATURE_COLUMNS).reset_index(drop=True)
+        clean_seq_df = prepare_clean_seq_df(feat_df)
 
         if len(clean_seq_df) >= 60:
             latest_close = float(clean_seq_df["Close"].iloc[-1])
@@ -676,6 +702,12 @@ with tab_inference:
                 mime="text/csv",
                 width="stretch"
             )
+        else:
+            st.warning(
+                f"⚠️ Insufficient continuous feature observations for **{ticker}** "
+                f"(retained {len(clean_seq_df)}/60 valid bars). "
+                f"The deep learning recurrent engine requires at least 60 consecutive trading bars to populate its 3D sequential receptive field."
+            )
 
 
 # ---------------------------------------------------------
@@ -713,14 +745,14 @@ with tab_screener:
         st.caption(f"Scanning `{len(SAMPLE_SCREENER_UNIVERSE)}` institutional universe stocks across Mega, Mid, and Growth sectors.")
 
     if st.button("🚀 Run Recurrent Universe Scan", type="primary", width="stretch"):
-        nifty_bars = fetch_clean_stock_bars("^NSEI", period_str="1y", interval_str="1d")
+        nifty_bars = fetch_clean_stock_bars(benchmark_ticker, period_str="2y", interval_str="1d")
         scan_results = []
         progress_bar = st.progress(0.0)
 
         for idx, item in enumerate(SAMPLE_SCREENER_UNIVERSE):
             s_ticker = item["ticker"]
             try:
-                s_bars = fetch_clean_stock_bars(s_ticker, period_str="1y", interval_str="1d")
+                s_bars = fetch_clean_stock_bars(s_ticker, period_str="2y", interval_str="1d")
                 if not s_bars.empty and len(s_bars) >= 60:
                     f_df = compute_single_stock_features(s_bars.copy())
                     if not nifty_bars.empty:
@@ -731,7 +763,7 @@ with tab_screener:
                         for c in ["nifty_return_1d", "nifty_return_5d", "nifty_return_20d", "nifty_vol_20", "stock_vs_nifty_return_5d"]:
                             f_df[c] = 0.0
 
-                    c_df = f_df.dropna(subset=FEATURE_COLUMNS).reset_index(drop=True)
+                    c_df = prepare_clean_seq_df(f_df)
                     if len(c_df) >= 60:
                         pred_r = predict_recurrent_dl(c_df, model_name=screener_dl_model)
                         l_close = float(c_df["Close"].iloc[-1])
@@ -822,6 +854,8 @@ with tab_screener:
                     "5-Day Forecast Return (%)": "{:+.2f}%",
                     "Projected Target Price": f"{currency_sym}" + "{:,.2f}"
                 }), width="stretch")
+        else:
+            st.warning("⚠️ No screener predictions could be generated for the universe tickers. Please ensure network connectivity and historical data availability.")
 
 
 # ---------------------------------------------------------

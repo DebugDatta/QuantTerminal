@@ -1,4 +1,4 @@
-# Python Bytecode & Environments
+# Python Bytecode & Virtual Environments
 __pycache__/
 *.py[cod]
 *$py.class
@@ -6,21 +6,39 @@ __pycache__/
 .venv/
 venv/
 env/
+ENV/
 *.egg-info/
 dist/
 build/
+eggs/
+.eggs/
 
-# Temporary Training & Diagnostic Logs
+# Streamlit Configuration & Secrets (Preserve config.toml, ignore secrets & state)
+.streamlit/*
+!.streamlit/config.toml
+
+# Scratch, Testing & Local Artifacts
+scratch/
+report_previews/
+*.pdf
+!QuantTerminal_System_Documentation.pdf
+.pytest_cache/
+.coverage
+htmlcov/
 *.log
 catboost_info/
 lightning_logs/
-
-# Streamlit & Jupyter Caches
-.streamlit/
 .ipynb_checkpoints/
+
+# Data Cache & Temporary Dumps
+data/cache/
+*.tmp
+*.temp
 
 # OS & Editor Metadata
 .DS_Store
 Thumbs.db
 .idea/
 .vscode/
+*.swp
+*.swo

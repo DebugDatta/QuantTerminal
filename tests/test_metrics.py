@@ -41,7 +41,9 @@ class TestSharpeRatio:
 
     def test_risk_free_rate_used_directly(self):
         rf = 0.02
-        expected = (MEAN_R - rf) / STD_R * math.sqrt(252)
+        ann_return = MEAN_R * 252
+        ann_vol = STD_R * math.sqrt(252)
+        expected = (ann_return - rf) / ann_vol
         assert sharpe_ratio(RETURNS, risk_free_rate=rf) == pytest.approx(expected)
 
     def test_zero_std_constant_returns(self):
@@ -63,30 +65,28 @@ class TestSortinoRatio:
     def test_documented_formula(self):
         negative = RETURNS[RETURNS < 0]
         downside_std = negative.std()
-        expected = (MEAN_R - 0.0) / downside_std
+        ann_return = MEAN_R * 252
+        ann_downside_std = downside_std * math.sqrt(252)
+        expected = (ann_return - 0.0) / ann_downside_std
         assert sortino_ratio(RETURNS) == pytest.approx(expected)
 
     def test_uses_only_negative_returns(self):
         negative = RETURNS[RETURNS < 0]
         downside_std = negative.std()
+        ann_return = MEAN_R * 252
+        ann_downside_std = downside_std * math.sqrt(252)
+        ann_vol = STD_R * math.sqrt(252)
         # Confirm we did NOT use full-series std
-        assert sortino_ratio(RETURNS) == pytest.approx((MEAN_R - 0.0) / downside_std)
-        assert sortino_ratio(RETURNS) != pytest.approx((MEAN_R - 0.0) / STD_R)
-
-    def test_no_undocumented_annualization(self):
-        negative = RETURNS[RETURNS < 0]
-        expected = (MEAN_R - 0.0) / negative.std()
-        assert sortino_ratio(RETURNS) == pytest.approx(expected)
-        assert not math.isclose(
-            sortino_ratio(RETURNS),
-            expected * math.sqrt(252),
-            rel_tol=1e-9,
-        )
+        assert sortino_ratio(RETURNS) == pytest.approx((ann_return - 0.0) / ann_downside_std)
+        assert sortino_ratio(RETURNS) != pytest.approx((ann_return - 0.0) / ann_vol)
 
     def test_risk_free_rate_used_directly(self):
         rf = 0.02
         negative = RETURNS[RETURNS < 0]
-        expected = (MEAN_R - rf) / negative.std()
+        downside_std = negative.std()
+        ann_return = MEAN_R * 252
+        ann_downside_std = downside_std * math.sqrt(252)
+        expected = (ann_return - rf) / ann_downside_std
         assert sortino_ratio(RETURNS, risk_free_rate=rf) == pytest.approx(expected)
 
     def test_no_negative_returns_is_nan(self):

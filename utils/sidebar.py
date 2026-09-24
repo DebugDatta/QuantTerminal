@@ -114,14 +114,19 @@ def render_sidebar():
     isin = str(row.get("ISIN", "")).strip() if pd.notna(row.get("ISIN")) else ""
 
     # Construct yfinance ticker
+    clean_sym = symbol
+    for sfx in (".NS", ".BO"):
+        if clean_sym.endswith(sfx):
+            clean_sym = clean_sym[:-len(sfx)]
+
     if region == "India":
         if exchange == "NSE":
-            ticker = f"{symbol}.NS"
+            ticker = f"{clean_sym}.NS"
         else:
-            ticker = f"{symbol}.BO"
+            ticker = f"{clean_sym}.BO"
     else:
         # US Stock ticker
-        ticker = symbol
+        ticker = clean_sym
 
     # 6. Preview Yahoo Finance Ticker
     st.sidebar.text_input(
@@ -168,7 +173,7 @@ def render_sidebar():
     st.session_state["selected_interval"] = interval
 
     st.sidebar.markdown("---")
-    st.sidebar.caption("Made by Quants SXC")
+    st.sidebar.caption("Made by Michael Fernandes")
 
     return ticker, company, exchange, period, interval, region
 

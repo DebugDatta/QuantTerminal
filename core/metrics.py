@@ -72,8 +72,12 @@ def sharpe_ratio(
     """
     mean_return = returns.mean()
     std_return = returns.std()
-    excess = mean_return - risk_free_rate
-    return float(excess / std_return * math.sqrt(periods_per_year))
+    if std_return == 0 or np.isnan(std_return):
+        return float("inf") if (mean_return * periods_per_year - risk_free_rate) > 0 else float("-inf")
+    # Annualized Sharpe ratio: (Annualized Return - Risk Free Rate) / Annualized Volatility
+    ann_return = mean_return * periods_per_year
+    ann_vol = std_return * math.sqrt(periods_per_year)
+    return float((ann_return - risk_free_rate) / ann_vol)
 
 
 # ---------------------------------------------------------------------------
@@ -83,40 +87,38 @@ def sharpe_ratio(
 def sortino_ratio(
     returns: pd.Series,
     risk_free_rate: float = 0.0,
+    periods_per_year: int = 252,
 ) -> float:
-    """Compute the Sortino Ratio.
+    """Compute the annualized Sortino Ratio.
 
-    Formula (RISK_ANALYTICS.md §1):
-        Sortino = (R_p - R_f) / sigma_down
-        sigma_down = std(negative returns only)
+    Formula (RISK_ANALYTICS.md §1 & Standard Quantitative Finance):
+        Sortino = (Annualized Return - Risk Free Rate) / Annualized Downside Volatility
+        where downside volatility is std of negative returns scaled by sqrt(periods_per_year).
 
     Parameters
     ----------
     returns : pd.Series
         Periodic return series.
     risk_free_rate : float, default 0.0
-        Annual risk-free rate. Used directly without periodic conversion
-        (per documented contract — no annualization rule for Sortino).
+        Annual risk-free rate.
+    periods_per_year : int, default 252
+        Number of return periods per year (252 for daily).
 
     Returns
     -------
     float
-        Sortino Ratio.
-
-    Notes
-    -----
-    - A (documented): formula is exactly (R_p - R_f) / sigma_down.
-    - A (documented): no annualization — RISK_ANALYTICS.md does NOT
-      state "Annualized" for Sortino (unlike Sharpe).
-    - B (assumption): risk_free_rate used directly (same reasoning as Sharpe).
-    - B (assumption): when there are no negative returns, sigma_down is
-      NaN (pandas .std() on an empty series); the result is NaN via
-      numpy semantics. Not documented.
+        Annualized Sortino Ratio.
     """
     mean_return = returns.mean()
-    downside_std = returns[returns < 0].std()
-    excess = mean_return - risk_free_rate
-    return float(excess / downside_std)
+    negative = returns[returns < 0]
+    downside_std = negative.std()
+    if pd.isna(downside_std) or len(negative) == 0:
+        return float("nan")
+    ann_return = mean_return * periods_per_year
+    ann_downside_std = downside_std * math.sqrt(periods_per_year)
+    if ann_downside_std == 0:
+        return float("inf") if ann_return > risk_free_rate else float("-inf")
+    return float((ann_return - risk_free_rate) / ann_downside_std)
 
 
 # ---------------------------------------------------------------------------
@@ -154,6 +156,8 @@ def calmar_ratio(
     """
     cagr_value = cagr(equity, periods_per_year=periods_per_year)
     mdd = max_drawdown(equity)
+    if pd.isna(mdd) or mdd == 0 or pd.isna(cagr_value):
+        return float("nan")
     return float(cagr_value / abs(mdd))
 
 
