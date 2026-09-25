@@ -470,10 +470,18 @@ st.markdown("""
     background: rgba(15, 23, 42, 0.8);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 12px;
-    padding: 16px 20px;
+    padding: 16px 12px;
     text-align: center;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
     transition: transform 0.2s ease, border-color 0.2s ease;
+    height: 105px !important;
+    min-height: 105px !important;
+    max-height: 105px !important;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
 }
 .qt-kpi-card:hover {
     transform: translateY(-2px);
@@ -481,18 +489,24 @@ st.markdown("""
 }
 .qt-kpi-val {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 2.1rem;
+    font-size: 2.0rem;
     font-weight: 800;
     color: #F8FAFC;
     line-height: 1.1;
 }
 .qt-kpi-lbl {
-    font-size: 0.82rem;
+    font-size: 0.78rem;
     font-weight: 600;
     color: #94A3B8;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
-    margin-top: 6px;
+    letter-spacing: 0.05em;
+    margin-top: 4px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    line-height: 1.2;
 }
 
 /* Domain Cards */
@@ -500,12 +514,14 @@ st.markdown("""
     background: rgba(15, 23, 42, 0.7);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 12px;
-    padding: 18px;
+    padding: 14px 10px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    height: 100%;
-    min-height: 170px;
+    height: 215px !important;
+    min-height: 215px !important;
+    max-height: 215px !important;
+    box-sizing: border-box;
     transition: all 0.25s ease;
 }
 .qt-domain-card:hover {
@@ -515,29 +531,39 @@ st.markdown("""
 }
 .qt-domain-header {
     display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 1.05rem;
+    align-items: flex-start;
+    gap: 6px;
+    font-size: 0.90rem;
     font-weight: 700;
     color: #F8FAFC;
     margin-bottom: 6px;
+    height: 44px;
+    min-height: 44px;
+    max-height: 44px;
+    line-height: 1.25;
 }
 .qt-domain-desc {
-    font-size: 0.82rem;
+    font-size: 0.76rem;
     color: #94A3B8;
-    line-height: 1.4;
-    margin-bottom: 12px;
-    flex-grow: 1;
+    line-height: 1.35;
+    margin-bottom: 8px;
+    height: 72px;
+    min-height: 72px;
+    max-height: 72px;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
 }
 .qt-domain-badge {
-    font-size: 0.74rem;
+    font-size: 0.70rem;
     font-weight: 700;
     color: #CBD5E1;
     background: rgba(255, 255, 255, 0.06);
     border-radius: 6px;
-    padding: 3px 8px;
+    padding: 2px 7px;
     width: fit-content;
-    margin-bottom: 12px;
+    margin-bottom: 0px;
 }
 
 /* Featured Workspace Cards */
@@ -545,11 +571,14 @@ st.markdown("""
     background: rgba(15, 23, 42, 0.8);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 12px;
-    padding: 16px;
+    padding: 14px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    height: 100%;
+    height: 270px !important;
+    min-height: 270px !important;
+    max-height: 270px !important;
+    box-sizing: border-box;
     transition: all 0.25s ease;
 }
 .qt-feat-card:hover {
@@ -559,34 +588,50 @@ st.markdown("""
 }
 .qt-feat-chart {
     width: 100%;
-    height: 90px;
+    height: 80px;
     border-radius: 8px;
     background: rgba(11, 15, 25, 0.6);
     border: 1px solid rgba(255, 255, 255, 0.04);
-    margin-bottom: 12px;
+    margin-bottom: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
 }
 .qt-feat-title {
-    font-size: 1.02rem;
+    font-size: 0.95rem;
     font-weight: 700;
     color: #F8FAFC;
+    height: 42px;
+    min-height: 42px;
+    max-height: 42px;
+    display: flex;
+    align-items: center;
+    line-height: 1.25;
     margin-bottom: 4px;
 }
 .qt-feat-desc {
-    font-size: 0.82rem;
+    font-size: 0.78rem;
     color: #94A3B8;
     line-height: 1.35;
-    margin-bottom: 10px;
-    flex-grow: 1;
+    margin-bottom: 6px;
+    height: 44px;
+    min-height: 44px;
+    max-height: 44px;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
 }
 .qt-tag-container {
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
-    margin-bottom: 12px;
+    height: 26px;
+    min-height: 26px;
+    max-height: 26px;
+    overflow: hidden;
+    margin-bottom: 0px;
 }
 .qt-tag {
     background: rgba(56, 189, 248, 0.1);
@@ -594,8 +639,9 @@ st.markdown("""
     border: 1px solid rgba(56, 189, 248, 0.25);
     border-radius: 4px;
     padding: 2px 7px;
-    font-size: 0.72rem;
+    font-size: 0.70rem;
     font-weight: 600;
+    white-space: nowrap;
 }
 
 /* Module Directory Card */
@@ -603,12 +649,14 @@ st.markdown("""
     background: rgba(15, 23, 42, 0.75);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 12px;
-    padding: 18px;
+    padding: 16px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    height: 100%;
-    min-height: 240px;
+    height: 380px !important;
+    min-height: 380px !important;
+    max-height: 380px !important;
+    box-sizing: border-box;
     transition: all 0.25s ease;
 }
 .qt-mod-card:hover {
@@ -619,29 +667,40 @@ st.markdown("""
 .qt-mod-header {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
+    align-items: center;
     margin-bottom: 8px;
+    height: 32px;
 }
 .qt-mod-name {
-    font-size: 1.05rem;
+    font-size: 1.02rem;
     font-weight: 700;
     color: #F8FAFC;
     display: flex;
     align-items: center;
     gap: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .qt-mod-desc {
     font-size: 0.82rem;
     color: #94A3B8;
     line-height: 1.4;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
+    height: 48px;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
 }
 .qt-mod-bullets {
-    margin: 0 0 14px 0;
+    margin: 0 0 10px 0;
     padding-left: 18px;
     font-size: 0.78rem;
     color: #CBD5E1;
     line-height: 1.45;
+    height: 95px;
+    overflow: hidden;
 }
 
 /* Quick Access Pills */
@@ -654,14 +713,24 @@ st.markdown("""
 }
 
 /* General Streamlit PageLink Styling Overrides */
+div[data-testid="stPageLink"] {
+    width: 100% !important;
+}
 div[data-testid="stPageLink"] a {
     background: rgba(37, 99, 235, 0.18) !important;
     border: 1px solid rgba(59, 130, 246, 0.4) !important;
     border-radius: 8px !important;
-    padding: 6px 12px !important;
+    padding: 6px 8px !important;
     transition: all 0.2s ease !important;
     text-align: center !important;
     justify-content: center !important;
+    width: 100% !important;
+    height: 38px !important;
+    min-height: 38px !important;
+    max-height: 38px !important;
+    display: flex !important;
+    align-items: center !important;
+    box-sizing: border-box !important;
 }
 div[data-testid="stPageLink"] a:hover {
     background: rgba(37, 99, 235, 0.4) !important;
@@ -671,8 +740,13 @@ div[data-testid="stPageLink"] a:hover {
 }
 div[data-testid="stPageLink"] p {
     font-weight: 600 !important;
-    font-size: 0.85rem !important;
+    font-size: 0.82rem !important;
     color: #F8FAFC !important;
+    margin: 0 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    line-height: 1 !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -995,18 +1069,20 @@ with col_ws:
     active_curr = "₹" if active_region == "India" else "$"
     
     st.markdown(f"""
-    <div style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.25);">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 8px;">
-            <span style="font-size: 0.85rem; color: #94A3B8; font-weight: 600;">ACTIVE TARGET ASSET</span>
-            <span style="background: #2563EB; color: white; padding: 3px 10px; border-radius: 6px; font-weight: 700; font-size: 0.82rem;">{active_ticker}</span>
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.84rem;">
-            <div style="display:flex; justify-content:space-between;"><span style="color:#94A3B8;">Company</span><span style="color:#F8FAFC; font-weight:600;">{active_company[:24]}</span></div>
-            <div style="display:flex; justify-content:space-between;"><span style="color:#94A3B8;">Region / Exchange</span><span style="color:#F8FAFC; font-weight:600;">{active_region} • {active_exchange}</span></div>
-            <div style="display:flex; justify-content:space-between;"><span style="color:#94A3B8;">Sampling Window</span><span style="color:#F8FAFC; font-weight:600;">Period: {active_period.upper()}</span></div>
-            <div style="display:flex; justify-content:space-between;"><span style="color:#94A3B8;">Sampling Frequency</span><span style="color:#F8FAFC; font-weight:600;">{active_interval}</span></div>
-            <div style="display:flex; justify-content:space-between;"><span style="color:#94A3B8;">Base Currency</span><span style="color:#38BDF8; font-weight:700;">{active_curr} ({'INR' if active_curr=='₹' else 'USD'})</span></div>
-            <div style="display:flex; justify-content:space-between;"><span style="color:#94A3B8;">State Sync</span><span style="color:#10B981; font-weight:600;">Active in Session</span></div>
+    <div style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.25); min-height: 295px; height: 100%; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box;">
+        <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 8px;">
+                <span style="font-size: 0.85rem; color: #94A3B8; font-weight: 600;">ACTIVE TARGET ASSET</span>
+                <span style="background: #2563EB; color: white; padding: 3px 10px; border-radius: 6px; font-weight: 700; font-size: 0.82rem;">{active_ticker}</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.84rem;">
+                <div style="display:flex; justify-content:space-between;"><span style="color:#94A3B8;">Company</span><span style="color:#F8FAFC; font-weight:600;">{active_company[:24]}</span></div>
+                <div style="display:flex; justify-content:space-between;"><span style="color:#94A3B8;">Region / Exchange</span><span style="color:#F8FAFC; font-weight:600;">{active_region} • {active_exchange}</span></div>
+                <div style="display:flex; justify-content:space-between;"><span style="color:#94A3B8;">Sampling Window</span><span style="color:#F8FAFC; font-weight:600;">Period: {active_period.upper()}</span></div>
+                <div style="display:flex; justify-content:space-between;"><span style="color:#94A3B8;">Sampling Frequency</span><span style="color:#F8FAFC; font-weight:600;">{active_interval}</span></div>
+                <div style="display:flex; justify-content:space-between;"><span style="color:#94A3B8;">Base Currency</span><span style="color:#38BDF8; font-weight:700;">{active_curr} ({'INR' if active_curr=='₹' else 'USD'})</span></div>
+                <div style="display:flex; justify-content:space-between;"><span style="color:#94A3B8;">State Sync</span><span style="color:#10B981; font-weight:600;">Active in Session</span></div>
+            </div>
         </div>
         <div style="margin-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 10px; font-size: 0.76rem; color: #64748B;">
             Use the sidebar to change the active ticker, exchange, or period across all modules.
@@ -1017,7 +1093,7 @@ with col_ws:
 with col_wf:
     st.markdown("#### ⚙️ How QuantTerminal Works")
     st.markdown("""
-    <div style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.25);">
+    <div style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.25); min-height: 295px; height: 100%; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box;">
         <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 12px;">
             <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 12px; text-align: center;">
                 <div style="font-size: 1.1rem; margin-bottom: 4px;">📥</div>
@@ -1099,38 +1175,38 @@ for mod in MODULE_REGISTRY:
 
 st.markdown(f"<div style='font-size:0.85rem; color:#64748B; margin-bottom: 14px;'>Showing <b>{len(filtered_modules)}</b> of {len(MODULE_REGISTRY)} modules</div>", unsafe_allow_html=True)
 
-# Render Module Grid (3 columns)
+# Render Module Grid (3 columns per row for balanced alignment)
 num_cols = 3
-grid_cols = st.columns(num_cols)
-
-for idx, mod in enumerate(filtered_modules):
-    target_col = grid_cols[idx % num_cols]
-    with target_col:
-        bullets = "".join([f"<li>{f}</li>" for f in mod["features"][:4]])
-        tags_badges = "".join([f"<span class='qt-tag'>{t}</span>" for t in mod["tags"][:3]])
-        
-        st.markdown(f"""
-        <div class="qt-mod-card" style="border-top: 3px solid {mod['domain_color']}; margin-bottom: 12px;">
-            <div>
-                <div class="qt-mod-header">
-                    <span class="qt-mod-name"><span>{mod['icon']}</span> {mod['name']}</span>
-                    <span style="font-size:0.72rem; font-weight:700; color:{mod['domain_color']}; background:rgba(255,255,255,0.06); padding:2px 7px; border-radius:4px;">{mod['domain']}</span>
+for row_idx in range(0, len(filtered_modules), num_cols):
+    row_modules = filtered_modules[row_idx:row_idx + num_cols]
+    row_cols = st.columns(num_cols)
+    for col, mod in zip(row_cols, row_modules):
+        with col:
+            bullets = "".join([f"<li>{f}</li>" for f in mod["features"][:4]])
+            tags_badges = "".join([f"<span class='qt-tag'>{t}</span>" for t in mod["tags"][:3]])
+            
+            st.markdown(f"""
+            <div class="qt-mod-card" style="border-top: 3px solid {mod['domain_color']}; margin-bottom: 12px;">
+                <div>
+                    <div class="qt-mod-header">
+                        <span class="qt-mod-name"><span>{mod['icon']}</span> {mod['name']}</span>
+                        <span style="font-size:0.72rem; font-weight:700; color:{mod['domain_color']}; background:rgba(255,255,255,0.06); padding:2px 7px; border-radius:4px;">{mod['domain']}</span>
+                    </div>
+                    <div class="qt-mod-desc">{mod['description']}</div>
+                    <div style="font-size: 0.74rem; font-weight: 700; color: #64748B; text-transform: uppercase; margin-bottom: 4px;">KEY CAPABILITIES:</div>
+                    <ul class="qt-mod-bullets">
+                        {bullets}
+                    </ul>
                 </div>
-                <div class="qt-mod-desc">{mod['description']}</div>
-                <div style="font-size: 0.74rem; font-weight: 700; color: #64748B; text-transform: uppercase; margin-bottom: 4px;">KEY CAPABILITIES:</div>
-                <ul class="qt-mod-bullets">
-                    {bullets}
-                </ul>
-            </div>
-            <div>
-                <div class="qt-tag-container" style="margin-bottom: 10px;">
-                    {tags_badges}
+                <div>
+                    <div class="qt-tag-container" style="margin-bottom: 10px;">
+                        {tags_badges}
+                    </div>
                 </div>
             </div>
-        </div>
-        """, unsafe_allow_html=True)
-        st.page_link(mod["path"], label=f"Open {mod['name']} →", width="stretch")
-        st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
+            st.page_link(mod["path"], label=f"Open {mod['name']} →", width="stretch")
+            st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
 st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
 
@@ -1160,7 +1236,7 @@ col_tech, col_data = st.columns([5, 5])
 with col_tech:
     st.markdown("#### 💻 Technology Ecosystem")
     st.markdown("""
-    <div style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.25);">
+    <div style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.25); min-height: 250px; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between;">
         <div style="font-size: 0.85rem; color: #94A3B8; margin-bottom: 14px; line-height: 1.45;">
             QuantTerminal is engineered in Python with production-grade scientific, econometric, and machine learning backbones:
         </div>
@@ -1181,7 +1257,7 @@ with col_tech:
 with col_data:
     st.markdown("#### 📡 Market Data Sources")
     st.markdown("""
-    <div style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.25);">
+    <div style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.25); min-height: 250px; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between;">
         <div style="font-size: 0.85rem; color: #94A3B8; margin-bottom: 12px; line-height: 1.45;">
             Market data ingested through live exchange feeds with automated calendar alignment and zero synthetic infilling:
         </div>
