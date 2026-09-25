@@ -62,7 +62,7 @@ MODULE_REGISTRY: List[Dict[str, Any]] = [
         "icon": "📊",
         "domain": "Market & Data",
         "domain_color": "#3B82F6",
-        "path": "pages/09_dashboard.py",
+        "path": "pages/01_Dashboard.py",
         "description": "Consolidated multi-asset institutional equity research dashboard and performance monitor.",
         "features": [
             "Real-time ticker metrics and volume",
@@ -80,7 +80,7 @@ MODULE_REGISTRY: List[Dict[str, Any]] = [
         "icon": "🌐",
         "domain": "Market & Data",
         "domain_color": "#3B82F6",
-        "path": "pages/10_market_explorer.py",
+        "path": "pages/02_Market_Explorer.py",
         "description": "Interactive market data analysis with advanced candlestick charting and institutional screener.",
         "features": [
             "Interactive OHLCV candlestick & volume charting",
@@ -98,7 +98,7 @@ MODULE_REGISTRY: List[Dict[str, Any]] = [
         "icon": "📉",
         "domain": "Market & Data",
         "domain_color": "#3B82F6",
-        "path": "pages/12_technical_analysis.py",
+        "path": "pages/03_Technical_Analysis.py",
         "description": "Algorithmic technical indicator workstation with momentum, volatility, and trend overlays.",
         "features": [
             "Bollinger Bands with bandwidth dynamics",
@@ -117,7 +117,7 @@ MODULE_REGISTRY: List[Dict[str, Any]] = [
         "icon": "💹",
         "domain": "Statistics & Returns",
         "domain_color": "#8B5CF6",
-        "path": "pages/14_Return_Analytics.py",
+        "path": "pages/12_Return_Analytics.py",
         "description": "Logarithmic return dynamics, compounding trajectories, and calendar period distribution analysis.",
         "features": [
             "Continuous logarithmic and discrete arithmetic returns",
@@ -135,7 +135,7 @@ MODULE_REGISTRY: List[Dict[str, Any]] = [
         "icon": "∑",
         "domain": "Statistics & Returns",
         "domain_color": "#8B5CF6",
-        "path": "pages/15_Statistical_Analysis.py",
+        "path": "pages/04_Statistical_Analysis.py",
         "description": "Empirical distribution moments, statistical hypothesis tests, and cross-asset correlation matrices.",
         "features": [
             "Higher-order moments: Skewness & Excess Kurtosis",
@@ -153,7 +153,7 @@ MODULE_REGISTRY: List[Dict[str, Any]] = [
         "icon": "⚡",
         "domain": "Statistics & Returns",
         "domain_color": "#8B5CF6",
-        "path": "pages/16_Volatility_Lab.py",
+        "path": "pages/05_Volatility_Lab.py",
         "description": "Realized volatility estimators, GARCH conditional variance models, and historical volatility cones.",
         "features": [
             "5 Estimators: Close-to-Close, Parkinson, Garman-Klass, Rogers-Satchell, Yang-Zhang",
@@ -172,7 +172,7 @@ MODULE_REGISTRY: List[Dict[str, Any]] = [
         "icon": "📈",
         "domain": "Forecasting",
         "domain_color": "#10B981",
-        "path": "pages/05_Time_Series_Forecasting.py",
+        "path": "pages/15_Time_Series_Forecasting.py",
         "description": "Econometric forecasting, classical decomposition, and automated ARIMA / SARIMA modeling.",
         "features": [
             "ARIMA & Seasonal SARIMA specification with auto-fit",
@@ -190,7 +190,7 @@ MODULE_REGISTRY: List[Dict[str, Any]] = [
         "icon": "🤖",
         "domain": "Forecasting",
         "domain_color": "#10B981",
-        "path": "pages/06_ML_Forecasting.py",
+        "path": "pages/16_ML_Forecasting.py",
         "description": "Supervised machine learning regressors and non-linear ensemble models with feature engineering.",
         "features": [
             "Linear, Ridge, Lasso, and ElasticNet regressors",
@@ -208,7 +208,7 @@ MODULE_REGISTRY: List[Dict[str, Any]] = [
         "icon": "🧠",
         "domain": "Forecasting",
         "domain_color": "#10B981",
-        "path": "pages/07_DL_Forecasting.py",
+        "path": "pages/17_DL_Forecasting.py",
         "description": "Deep neural network sequence architectures for high-order temporal sequence forecasting.",
         "features": [
             "LSTM (Long Short-Term Memory) sequential networks",
@@ -227,7 +227,7 @@ MODULE_REGISTRY: List[Dict[str, Any]] = [
         "icon": "🎲",
         "domain": "Simulation & Risk",
         "domain_color": "#EF4444",
-        "path": "pages/02_Monte_Carlo_Simulations.py",
+        "path": "pages/14_Monte_Carlo_Simulations.py",
         "description": "Stochastic simulation, multi-path future price trajectory generation, and probability distributions.",
         "features": [
             "Geometric Brownian Motion (GBM) stochastic paths",
@@ -245,7 +245,7 @@ MODULE_REGISTRY: List[Dict[str, Any]] = [
         "icon": "🛡️",
         "domain": "Simulation & Risk",
         "domain_color": "#EF4444",
-        "path": "pages/18_Risk_Analytics.py",
+        "path": "pages/13_Risk_Analytics.py",
         "description": "Value at Risk (VaR), Expected Shortfall (CVaR), and comprehensive drawdown analytics.",
         "features": [
             "Historical, Parametric, and Cornish-Fisher Tail VaR",
@@ -263,7 +263,7 @@ MODULE_REGISTRY: List[Dict[str, Any]] = [
         "icon": "🎯",
         "domain": "Simulation & Risk",
         "domain_color": "#EF4444",
-        "path": "pages/01_Regime_Detection.py",
+        "path": "pages/06_Regime_Detection.py",
         "description": "Hidden Markov Models (Gaussian HMM) for identifying latent market regimes and volatility shifts.",
         "features": [
             "Gaussian HMM 2-state and 3-state modeling",
@@ -282,7 +282,7 @@ MODULE_REGISTRY: List[Dict[str, Any]] = [
         "icon": "🧪",
         "domain": "Strategy & Trading",
         "domain_color": "#F97316",
-        "path": "pages/11_strategy_lab.py",
+        "path": "pages/08_Strategy_Lab.py",
         "description": "Quantitative algorithmic strategy research, composite logic builder, and tournament ranking.",
         "features": [
             "11 built-in systematic strategies (Trend, Mean Reversion, Breakout)",
@@ -300,7 +300,7 @@ MODULE_REGISTRY: List[Dict[str, Any]] = [
         "icon": "⚙️",
         "domain": "Strategy & Trading",
         "domain_color": "#F97316",
-        "path": "pages/04_Backtesting.py",
+        "path": "pages/10_Backtesting.py",
         "description": "Event-driven and vectorized backtesting engine with realistic execution frictions.",
         "features": [
             "Vectorized backtest execution with lag timing",
@@ -318,7 +318,7 @@ MODULE_REGISTRY: List[Dict[str, Any]] = [
         "icon": "🕹️",
         "domain": "Strategy & Trading",
         "domain_color": "#F97316",
-        "path": "pages/08_RL_Trading.py",
+        "path": "pages/18_RL_Trading.py",
         "description": "Reinforcement learning agent training in simulated financial market environments.",
         "features": [
             "Gymnasium financial trading environment",
@@ -337,7 +337,7 @@ MODULE_REGISTRY: List[Dict[str, Any]] = [
         "icon": "💼",
         "domain": "Portfolio & Research",
         "domain_color": "#F59E0B",
-        "path": "pages/13_portfolio_lab.py",
+        "path": "pages/11_Portfolio_Lab.py",
         "description": "Modern Portfolio Theory, Markowitz mean-variance optimization, and risk parity allocation.",
         "features": [
             "Markowitz Efficient Frontier generation",
@@ -355,7 +355,7 @@ MODULE_REGISTRY: List[Dict[str, Any]] = [
         "icon": "🔬",
         "domain": "Portfolio & Research",
         "domain_color": "#F59E0B",
-        "path": "pages/19_Factor_Research.py",
+        "path": "pages/07_Factor_Research.py",
         "description": "Systematic multi-factor risk attribution, market beta decomposition, and style exposures.",
         "features": [
             "CAPM Market Beta and Jensen's Alpha estimation",
@@ -373,7 +373,7 @@ MODULE_REGISTRY: List[Dict[str, Any]] = [
         "icon": "⚖️",
         "domain": "Portfolio & Research",
         "domain_color": "#F59E0B",
-        "path": "pages/20_Statistical_Arbitrage.py",
+        "path": "pages/09_Statistical_Arbitrage.py",
         "description": "Pairs trading, cointegration testing, and mean-reverting spread modeling.",
         "features": [
             "Engle-Granger two-step cointegration test",
@@ -392,7 +392,7 @@ MODULE_REGISTRY: List[Dict[str, Any]] = [
         "icon": "📑",
         "domain": "Reporting",
         "domain_color": "#06B6D4",
-        "path": "pages/17_reports.py",
+        "path": "pages/19_Report_Generation.py",
         "description": "Consolidated 20-page institutional quantitative research PDF report generation center.",
         "features": [
             "Full-canvas 20-page institutional research PDF document",
@@ -702,9 +702,9 @@ with col_hero_text:
     # Hero action buttons
     c_btn1, c_btn2, c_sp = st.columns([2.5, 3.2, 4.3])
     with c_btn1:
-        st.page_link("pages/10_market_explorer.py", label="Explore Analytics →", icon="🌐", width="stretch")
+        st.page_link("pages/02_Market_Explorer.py", label="Explore Analytics →", icon="🌐", width="stretch")
     with c_btn2:
-        st.page_link("pages/17_reports.py", label="Generate Research Report", icon="📑", width="stretch")
+        st.page_link("pages/19_Report_Generation.py", label="Generate Research Report", icon="📑", width="stretch")
 
 with col_hero_visual:
     st.markdown("""
@@ -779,13 +779,13 @@ st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
 st.markdown("#### ⚡ Quick Access")
 qa_cols = st.columns(7)
 qa_items = [
-    ("Market Explorer", "pages/10_market_explorer.py", "📊"),
-    ("Time Series", "pages/05_Time_Series_Forecasting.py", "📈"),
-    ("ML Forecasting", "pages/06_ML_Forecasting.py", "🤖"),
-    ("Monte Carlo", "pages/02_Monte_Carlo_Simulations.py", "🎲"),
-    ("Backtesting", "pages/04_Backtesting.py", "🧪"),
-    ("Risk Analytics", "pages/18_Risk_Analytics.py", "🛡️"),
-    ("Reports", "pages/17_reports.py", "📑"),
+    ("Market Explorer", "pages/02_Market_Explorer.py", "📊"),
+    ("Time Series", "pages/15_Time_Series_Forecasting.py", "📈"),
+    ("ML Forecasting", "pages/16_ML_Forecasting.py", "🤖"),
+    ("Monte Carlo", "pages/14_Monte_Carlo_Simulations.py", "🎲"),
+    ("Backtesting", "pages/10_Backtesting.py", "🧪"),
+    ("Risk Analytics", "pages/13_Risk_Analytics.py", "🛡️"),
+    ("Reports", "pages/19_Report_Generation.py", "📑"),
 ]
 for col, (label, path, icon) in zip(qa_cols, qa_items):
     with col:
@@ -807,7 +807,7 @@ DOMAINS = [
         "color": "#3B82F6",
         "desc": "Market data, price analysis, and technical indicators",
         "count": "3 Modules",
-        "target": "pages/10_market_explorer.py",
+        "target": "pages/02_Market_Explorer.py",
     },
     {
         "name": "Statistics & Returns",
@@ -815,7 +815,7 @@ DOMAINS = [
         "color": "#8B5CF6",
         "desc": "Statistical analysis, return dynamics, and distributions",
         "count": "3 Modules",
-        "target": "pages/14_Return_Analytics.py",
+        "target": "pages/12_Return_Analytics.py",
     },
     {
         "name": "Forecasting",
@@ -823,7 +823,7 @@ DOMAINS = [
         "color": "#10B981",
         "desc": "Time series, machine learning, and deep learning forecasting",
         "count": "3 Modules",
-        "target": "pages/05_Time_Series_Forecasting.py",
+        "target": "pages/15_Time_Series_Forecasting.py",
     },
     {
         "name": "Simulation & Risk",
@@ -831,7 +831,7 @@ DOMAINS = [
         "color": "#EF4444",
         "desc": "Monte Carlo, risk metrics, volatility, and regime analysis",
         "count": "4 Modules",
-        "target": "pages/02_Monte_Carlo_Simulations.py",
+        "target": "pages/14_Monte_Carlo_Simulations.py",
     },
     {
         "name": "Strategy & Trading",
@@ -839,7 +839,7 @@ DOMAINS = [
         "color": "#F97316",
         "desc": "Strategy development, backtesting, and RL trading",
         "count": "3 Modules",
-        "target": "pages/11_strategy_lab.py",
+        "target": "pages/08_Strategy_Lab.py",
     },
     {
         "name": "Portfolio & Research",
@@ -847,7 +847,7 @@ DOMAINS = [
         "color": "#F59E0B",
         "desc": "Portfolio optimization, factor research, and stat-arb",
         "count": "3 Modules",
-        "target": "pages/13_portfolio_lab.py",
+        "target": "pages/11_Portfolio_Lab.py",
     },
     {
         "name": "Reporting",
@@ -855,7 +855,7 @@ DOMAINS = [
         "color": "#06B6D4",
         "desc": "Generate professional 20-page research reports",
         "count": "1 Module",
-        "target": "pages/17_reports.py",
+        "target": "pages/19_Report_Generation.py",
     },
 ]
 
@@ -949,35 +949,35 @@ FEATURED_ITEMS = [
         "desc": "Interactive market data analysis with advanced charting and fundamental screener.",
         "tags": ["Market", "Charts", "Data"],
         "svg": SVG_MARKET,
-        "target": "pages/10_market_explorer.py",
+        "target": "pages/02_Market_Explorer.py",
     },
     {
         "title": "Time Series Forecasting",
         "desc": "ARIMA, SARIMA and classical econometric time-series models with forecast bounds.",
         "tags": ["ARIMA", "Forecast", "Econometrics"],
         "svg": SVG_FORECAST,
-        "target": "pages/05_Time_Series_Forecasting.py",
+        "target": "pages/15_Time_Series_Forecasting.py",
     },
     {
         "title": "Monte Carlo Simulations",
         "desc": "Stochastic simulation, future path analysis, and empirical probability bounds.",
         "tags": ["Simulation", "VaR", "CVaR"],
         "svg": SVG_MONTE_CARLO,
-        "target": "pages/02_Monte_Carlo_Simulations.py",
+        "target": "pages/14_Monte_Carlo_Simulations.py",
     },
     {
         "title": "Backtesting",
         "desc": "Strategy backtesting with friction modeling, trade logs, and risk teardowns.",
         "tags": ["Strategy", "Performance", "Risk"],
         "svg": SVG_BACKTEST,
-        "target": "pages/04_Backtesting.py",
+        "target": "pages/10_Backtesting.py",
     },
     {
         "title": "Risk Analytics",
         "desc": "VaR, CVaR, underwater drawdown anatomy, and historical stress tests.",
         "tags": ["Risk", "VaR", "Drawdown"],
         "svg": SVG_RISK,
-        "target": "pages/18_Risk_Analytics.py",
+        "target": "pages/13_Risk_Analytics.py",
     },
 ]
 
@@ -1240,7 +1240,7 @@ st.markdown("""
 
 col_rep_btn, _ = st.columns([3.5, 6.5])
 with col_rep_btn:
-    st.page_link("pages/17_reports.py", label="Generate 20-Page Research Report →", icon="📑", width="stretch")
+    st.page_link("pages/19_Report_Generation.py", label="Generate 20-Page Research Report →", icon="📑", width="stretch")
 
 st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
 

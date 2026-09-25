@@ -15,7 +15,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 import math
 from typing import Any, Dict, List, Optional
-
+import yfinance as yf
 import numpy as np
 import pandas as pd
 import plotly.express as px
