@@ -680,49 +680,28 @@ div[data-testid="stPageLink"] p {
 # =============================================================================
 # 4. Hero Section
 # =============================================================================
-col_hero_text, col_hero_visual = st.columns([7, 3])
-
-with col_hero_text:
-    st.markdown("""
-    <div class="qt-hero" style="margin-bottom: 0px;">
-        <h1 class="qt-hero-title">
-            <span>📊</span> QuantTerminal
-        </h1>
-        <div class="qt-hero-subtitle">
-            Quantitative Research & Analytics Platform
-        </div>
-        <div class="qt-hero-desc">
-            A unified institutional environment for market analysis, statistical modelling,
-            forecasting, risk analytics, stochastic simulation, algorithmic strategy backtesting,
-            and 20-page reproducible quantitative research reporting.
-        </div>
+st.markdown("""
+<div class="qt-hero" style="margin-bottom: 0px;">
+    <h1 class="qt-hero-title">
+        <span>📊</span> QuantTerminal
+    </h1>
+    <div class="qt-hero-subtitle">
+        Quantitative Research & Analytics Platform
     </div>
-    """, unsafe_allow_html=True)
-    
-    # Hero action buttons
-    c_btn1, c_btn2, c_sp = st.columns([2.5, 3.2, 4.3])
-    with c_btn1:
-        st.page_link("pages/02_Market_Explorer.py", label="Explore Analytics →", icon="🌐", width="stretch")
-    with c_btn2:
-        st.page_link("pages/19_Report_Generation.py", label="Generate Research Report", icon="📑", width="stretch")
-
-with col_hero_visual:
-    st.markdown("""
-    <div class="qt-hero" style="height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: flex-end; padding: 24px; text-align: right;">
-        <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.74rem; font-weight: 700; color: #38BDF8; letter-spacing: 0.12em; margin-bottom: 8px;">
-            Team Members
-        </div>
-        <div style="font-size: 0.85rem; font-weight: 600; color: #CBD5E1; line-height: 1.8;">
-            Pramit Datta<br>
-            Michael Fernandes<br>
-            Pranav Sahay<br>
-            Aashima Grover
-        </div>
-        <div style="margin-top: 14px; font-size: 0.76rem; color: #10B981; font-weight: 600; display: flex; align-items: center; gap: 6px;">
-            <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#10B981;"></span> Core Engines Ready
-        </div>
+    <div class="qt-hero-desc">
+        A unified institutional environment for market analysis, statistical modelling,
+        forecasting, risk analytics, stochastic simulation, algorithmic strategy backtesting,
+        and 20-page reproducible quantitative research reporting.
     </div>
-    """, unsafe_allow_html=True)
+</div>
+""", unsafe_allow_html=True)
+
+# Hero action buttons
+c_btn1, c_btn2, c_sp = st.columns([2.5, 3.2, 4.3])
+with c_btn1:
+    st.page_link("pages/02_Market_Explorer.py", label="Explore Analytics →", icon="🌐", width="stretch")
+with c_btn2:
+    st.page_link("pages/19_Report_Generation.py", label="Generate Research Report", icon="📑", width="stretch")
 
 st.markdown("<div style='height: 18px;'></div>", unsafe_allow_html=True)
 

@@ -173,7 +173,7 @@ def render_sidebar():
     st.session_state["selected_interval"] = interval
 
     st.sidebar.markdown("---")
-    st.sidebar.caption("Made by Michael Fernandes")
+    st.sidebar.caption("Made by Fincell Quants")
 
     return ticker, company, exchange, period, interval, region
 
