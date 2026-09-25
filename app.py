@@ -1217,9 +1217,11 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-col_rep_btn, _ = st.columns([3.5, 6.5])
+col_rep_btn, col_cred_btn, _ = st.columns([3.5, 3.5, 3.0])
 with col_rep_btn:
     st.page_link("pages/19_Report_Generation.py", label="Generate 20-Page Research Report →", icon="📑", width="stretch")
+with col_cred_btn:
+    st.page_link("pages/20_Credits.py", label="Project Credits & Governance →", icon="👥", width="stretch")
 
 st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
 
