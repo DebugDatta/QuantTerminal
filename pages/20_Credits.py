@@ -69,26 +69,8 @@ def _load_system_documentation():
     # Fallback minimal valid PDF if disk file missing
     return b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R/Resources<<>>>>endobj\nxref\n0 4\n0000000000 65535 f\n0000000009 00000 n\n0000000052 00000 n\n0000000101 00000 n\ntrailer<</Size 4/Root 1 0 R>>\nstartxref\n178\n%%EOF\n", 0.96
 
-doc_pdf_data, doc_size_mb = _load_system_documentation()
 
-# Persistent Documentation Download in Sidebar (Always Rendered)
-with st.sidebar:
-    st.markdown("---")
-    st.markdown("""
-    <div style="font-size: 0.8rem; font-weight: 700; color: #38BDF8; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px;">
-        📑 System Documentation
-    </div>
-    """, unsafe_allow_html=True)
-    st.download_button(
-        label=f"📥 Download Documentation ({doc_size_mb:.2f} MB)" if doc_size_mb > 0 else "📥 Download Documentation",
-        data=doc_pdf_data,
-        file_name="QuantTerminal_System_Documentation.pdf",
-        mime="application/pdf",
-        type="primary",
-        use_container_width=True,
-        key="sidebar_doc_btn",
-        help="Download the complete 20-page institutional system documentation PDF"
-    )
+doc_pdf_data, doc_size_mb = _load_system_documentation()
 
 # Custom Styling for Credits Cards & Badges
 st.markdown("""
@@ -396,23 +378,8 @@ st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
 # =============================================================================
 # 5. Interactive Per-Person Deliverables & Direct Page Navigation
 # =============================================================================
-s5_col1, s5_col2 = st.columns([3, 1.2])
-with s5_col1:
-    st.markdown("### 📑 Detailed Workstream Deliverables & Module Access")
-    st.caption("Inspect the exact modules, files, and jump directly to each contributor's assigned pages in the running platform.")
-with s5_col2:
-    if doc_pdf_data:
-        st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
-        st.download_button(
-            label="📥 Download Documentation",
-            data=doc_pdf_data,
-            file_name="QuantTerminal_System_Documentation.pdf",
-            mime="application/pdf",
-            type="primary",
-            use_container_width=True,
-            key="btn_download_s5_hdr",
-            help="Download the complete 20-page institutional system documentation PDF"
-        )
+st.markdown("### 📑 Detailed Workstream Deliverables & Module Access")
+st.caption("Inspect the exact modules, files, and jump directly to each contributor's assigned pages in the running platform.")
 
 tab_michael, tab_pranav, tab_aashima, tab_plan = st.tabs([
     "👨‍💻 Michael's Workstream (Engine + ML)",
@@ -444,19 +411,6 @@ with tab_michael:
         st.page_link("pages/17_DL_Forecasting.py", label="17. DL Forecasting", icon="🧠", width="stretch")
         st.page_link("pages/06_Regime_Detection.py", label="06. Regime Detection", icon="🎯", width="stretch")
         st.page_link("pages/18_RL_Trading.py", label="18. RL Trading Environment", icon="🕹️", width="stretch")
-        
-        if doc_pdf_data:
-            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-            st.download_button(
-                label="📥 Download Documentation",
-                data=doc_pdf_data,
-                file_name="QuantTerminal_System_Documentation.pdf",
-                mime="application/pdf",
-                type="primary",
-                use_container_width=True,
-                key="btn_download_michael_tab",
-                help="Download the complete 20-page institutional system documentation PDF"
-            )
 
 with tab_pranav:
     st.markdown("#### Pranav Sahai — Statistics & Risk Analytics")
@@ -516,17 +470,6 @@ with tab_plan:
         {"Phase": "Phase 4", "Duration": "Days 25–30", "Focus": "Institutional 20-Page PDF & Platform Polish", "Key Milestone": "Clean PDF compilation, theme consistency, and Streamlit Cloud deployment readiness."}
     ]
     st.dataframe(pd.DataFrame(plan_data), width="stretch", hide_index=True)
-    
-    if doc_pdf_data:
-        st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
-        st.download_button(
-            label="📥 Download System Documentation (PDF)",
-            data=doc_pdf_data,
-            file_name="QuantTerminal – System Documentation.pdf",
-            mime="application/pdf",
-            key="btn_download_plan_doc",
-            help="Download the complete 20-page institutional system documentation PDF"
-        )
 
 # =============================================================================
 # 6. Architectural Contracts & Attribution Footer
