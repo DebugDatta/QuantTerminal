@@ -21,6 +21,8 @@ eggs/
 scratch/
 report_previews/
 *.pdf
+!data/QuantTerminal – System Documentation.pdf
+!data/*Documentation*.pdf
 !QuantTerminal_System_Documentation.pdf
 .pytest_cache/
 .coverage
