@@ -130,6 +130,74 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =============================================================================
+# 2.5 Official System Documentation Download
+# =============================================================================
+doc_pdf_path = os.path.join(_root_dir, "data", "QuantTerminal – System Documentation.pdf")
+if not os.path.exists(doc_pdf_path):
+    data_dir = os.path.join(_root_dir, "data")
+    if os.path.exists(data_dir):
+        for fname in os.listdir(data_dir):
+            if fname.endswith(".pdf") and "documentation" in fname.lower():
+                doc_pdf_path = os.path.join(data_dir, fname)
+                break
+
+doc_pdf_data = None
+doc_size_mb = 0.0
+if os.path.exists(doc_pdf_path):
+    try:
+        with open(doc_pdf_path, "rb") as f:
+            doc_pdf_data = f.read()
+        doc_size_mb = len(doc_pdf_data) / (1024 * 1024)
+    except Exception as e:
+        doc_pdf_data = None
+
+if doc_pdf_data:
+    st.markdown("""
+    <style>
+    .qt-doc-banner {
+        background: linear-gradient(135deg, rgba(14, 165, 233, 0.12) 0%, rgba(15, 23, 42, 0.85) 100%);
+        border: 1px solid rgba(56, 189, 248, 0.35);
+        border-radius: 14px;
+        padding: 18px 22px;
+        margin-bottom: 24px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    d_col1, d_col2 = st.columns([3, 1.2])
+    with d_col1:
+        st.markdown(f"""
+        <div class="qt-doc-banner" style="margin-bottom: 0;">
+            <div style="display: flex; align-items: center; gap: 16px;">
+                <span style="font-size: 2.2rem; line-height: 1;">📑</span>
+                <div>
+                    <div style="font-size: 1.05rem; font-weight: 700; color: #F8FAFC; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                        QuantTerminal — Official System Documentation
+                        <span class="qt-stat-pill" style="background: rgba(56, 189, 248, 0.15); color: #38BDF8; border: 1px solid rgba(56, 189, 248, 0.3); margin: 0;">PDF • {doc_size_mb:.2f} MB</span>
+                    </div>
+                    <div style="font-size: 0.83rem; color: #94A3B8; margin-top: 4px; line-height: 1.45;">
+                        Complete 20-page institutional engineering specification, architecture contracts, task division, and bias mitigation protocols.
+                    </div>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    with d_col2:
+        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+        st.download_button(
+            label="📥 Download Documentation",
+            data=doc_pdf_data,
+            file_name="QuantTerminal – System Documentation.pdf",
+            mime="application/pdf",
+            type="primary",
+            use_container_width=True,
+            key="btn_download_sys_doc_header",
+            help="Download the complete 20-page institutional system documentation PDF"
+        )
+    st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
+
+# =============================================================================
 # 3. Project Leadership Section
 # =============================================================================
 st.markdown("### 👑 Project Leadership")
@@ -383,6 +451,17 @@ with tab_plan:
         {"Phase": "Phase 4", "Duration": "Days 25–30", "Focus": "Institutional 20-Page PDF & Platform Polish", "Key Milestone": "Clean PDF compilation, theme consistency, and Streamlit Cloud deployment readiness."}
     ]
     st.dataframe(pd.DataFrame(plan_data), width="stretch", hide_index=True)
+    
+    if doc_pdf_data:
+        st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
+        st.download_button(
+            label="📥 Download System Documentation (PDF)",
+            data=doc_pdf_data,
+            file_name="QuantTerminal – System Documentation.pdf",
+            mime="application/pdf",
+            key="btn_download_plan_doc",
+            help="Download the complete 20-page institutional system documentation PDF"
+        )
 
 # =============================================================================
 # 6. Architectural Contracts & Attribution Footer
