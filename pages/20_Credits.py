@@ -20,6 +20,40 @@ from utils.helper import inject_custom_theme
 from utils.sidebar import render_sidebar
 
 # =============================================================================
+# System Documentation Loader (Cached)
+# =============================================================================
+@st.cache_data(show_spinner=False)
+def _load_system_documentation():
+    possible_paths = [
+        os.path.join(_root_dir, "data", "QuantTerminal_System_Documentation.pdf"),
+        os.path.join(_root_dir, "data", "QuantTerminal – System Documentation.pdf"),
+        os.path.join(_root_dir, "data", "QuantTerminal - System Documentation.pdf"),
+    ]
+    data_dir = os.path.join(_root_dir, "data")
+    if os.path.isdir(data_dir):
+        try:
+            for fname in os.listdir(data_dir):
+                if fname.lower().endswith(".pdf") and "documentation" in fname.lower():
+                    full_p = os.path.join(data_dir, fname)
+                    if full_p not in possible_paths:
+                        possible_paths.append(full_p)
+        except Exception:
+            pass
+    
+    for p in possible_paths:
+        if os.path.isfile(p):
+            try:
+                with open(p, "rb") as f:
+                    content = f.read()
+                if content and len(content) > 1000:
+                    return content, len(content) / (1024 * 1024)
+            except Exception:
+                continue
+    return None, 0.0
+
+doc_pdf_data, doc_size_mb = _load_system_documentation()
+
+# =============================================================================
 # 1. Page Configuration & Theme
 # =============================================================================
 st.set_page_config(
@@ -33,6 +67,26 @@ inject_custom_theme()
 
 # Unified Persistent Sidebar
 render_sidebar()
+
+# Persistent Documentation Download in Sidebar
+if doc_pdf_data:
+    with st.sidebar:
+        st.markdown("---")
+        st.markdown("""
+        <div style="font-size: 0.8rem; font-weight: 700; color: #38BDF8; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px;">
+            📑 System Documentation
+        </div>
+        """, unsafe_allow_html=True)
+        st.download_button(
+            label="📥 Download Documentation",
+            data=doc_pdf_data,
+            file_name="QuantTerminal_System_Documentation.pdf",
+            mime="application/pdf",
+            type="primary",
+            use_container_width=True,
+            key="sidebar_doc_btn",
+            help="Download the complete 20-page institutional system documentation PDF"
+        )
 
 # Custom Styling for Credits Cards & Badges
 st.markdown("""
@@ -132,25 +186,6 @@ st.markdown("""
 # =============================================================================
 # 2.5 Official System Documentation Download
 # =============================================================================
-doc_pdf_path = os.path.join(_root_dir, "data", "QuantTerminal – System Documentation.pdf")
-if not os.path.exists(doc_pdf_path):
-    data_dir = os.path.join(_root_dir, "data")
-    if os.path.exists(data_dir):
-        for fname in os.listdir(data_dir):
-            if fname.endswith(".pdf") and "documentation" in fname.lower():
-                doc_pdf_path = os.path.join(data_dir, fname)
-                break
-
-doc_pdf_data = None
-doc_size_mb = 0.0
-if os.path.exists(doc_pdf_path):
-    try:
-        with open(doc_pdf_path, "rb") as f:
-            doc_pdf_data = f.read()
-        doc_size_mb = len(doc_pdf_data) / (1024 * 1024)
-    except Exception as e:
-        doc_pdf_data = None
-
 if doc_pdf_data:
     st.markdown("""
     <style>
@@ -188,7 +223,7 @@ if doc_pdf_data:
         st.download_button(
             label="📥 Download Documentation",
             data=doc_pdf_data,
-            file_name="QuantTerminal – System Documentation.pdf",
+            file_name="QuantTerminal_System_Documentation.pdf",
             mime="application/pdf",
             type="primary",
             use_container_width=True,
@@ -359,8 +394,23 @@ st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
 # =============================================================================
 # 5. Interactive Per-Person Deliverables & Direct Page Navigation
 # =============================================================================
-st.markdown("### 📑 Detailed Workstream Deliverables & Module Access")
-st.caption("Inspect the exact modules, files, and jump directly to each contributor's assigned pages in the running platform.")
+s5_col1, s5_col2 = st.columns([3, 1.2])
+with s5_col1:
+    st.markdown("### 📑 Detailed Workstream Deliverables & Module Access")
+    st.caption("Inspect the exact modules, files, and jump directly to each contributor's assigned pages in the running platform.")
+with s5_col2:
+    if doc_pdf_data:
+        st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
+        st.download_button(
+            label="📥 Download Documentation",
+            data=doc_pdf_data,
+            file_name="QuantTerminal_System_Documentation.pdf",
+            mime="application/pdf",
+            type="primary",
+            use_container_width=True,
+            key="btn_download_s5_hdr",
+            help="Download the complete 20-page institutional system documentation PDF"
+        )
 
 tab_michael, tab_pranav, tab_aashima, tab_plan = st.tabs([
     "👨‍💻 Michael's Workstream (Engine + ML)",
@@ -392,6 +442,19 @@ with tab_michael:
         st.page_link("pages/17_DL_Forecasting.py", label="17. DL Forecasting", icon="🧠", width="stretch")
         st.page_link("pages/06_Regime_Detection.py", label="06. Regime Detection", icon="🎯", width="stretch")
         st.page_link("pages/18_RL_Trading.py", label="18. RL Trading Environment", icon="🕹️", width="stretch")
+        
+        if doc_pdf_data:
+            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+            st.download_button(
+                label="📥 Download Documentation",
+                data=doc_pdf_data,
+                file_name="QuantTerminal_System_Documentation.pdf",
+                mime="application/pdf",
+                type="primary",
+                use_container_width=True,
+                key="btn_download_michael_tab",
+                help="Download the complete 20-page institutional system documentation PDF"
+            )
 
 with tab_pranav:
     st.markdown("#### Pranav Sahai — Statistics & Risk Analytics")
